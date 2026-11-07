@@ -239,12 +239,13 @@ public static class Core
     // ---- releases
     static string S(Dictionary<string, object> d, string k) { object v; return d.TryGetValue(k, out v) && v != null ? v.ToString() : null; }
 
-    public static Release Latest(EmuDef e)
+    // fresh: ask the host now instead of using a list remembered in the last 10 minutes
+    public static Release Latest(EmuDef e, bool fresh = false)
     {
         // a busy repo can push a quiet channel off the first page: look at up to three pages
         for (int page = 1; page <= 3; page++)
         {
-            object[] list = ReleasesJson(e.Host, e.ApiBase, e.Repo, page);
+            object[] list = ReleasesJson(e.Host, e.ApiBase, e.Repo, page, fresh);
             Release best = PickLatest(e, list, true) ?? PickLatest(e, list, false);
             if (best != null) return best;
             if (list.Length < (e.Host == "gitea" ? 50 : 100)) break;   // that was the last page
@@ -574,12 +575,39 @@ public static class Core
 
     // Raw release list (newest pages first) from GitHub or a Gitea / Forgejo host.
     static object[] ReleasesJson(string host, string apiBase, string repo) { return ReleasesJson(host, apiBase, repo, 1); }
-    static object[] ReleasesJson(string host, string apiBase, string repo, int page)
+    // Release lists are remembered for 10 minutes (DataDir\cache), so opening the app or a window again doesn't ask the
+    // host each time (GitHub allows 60 anonymous requests an hour). fresh: ask the host anyway ("Check for updates").
+    // When the host can't be reached, an older remembered list is used rather than failing.
+    public static readonly TimeSpan CacheFor = TimeSpan.FromMinutes(10);
+    static object[] ReleasesJson(string host, string apiBase, string repo, int page, bool fresh = false)
     {
         string url = host == "gitea"
             ? apiBase.TrimEnd('/') + "/repos/" + repo + "/releases?limit=50&page=" + page
             : "https://api.github.com/repos/" + repo + "/releases?per_page=100&page=" + page;
-        object[] list = Json.DeserializeObject(GetText(url)) as object[];
+        string file = null, text = null;
+        try
+        {
+            using (SHA1 h = SHA1.Create())
+                file = Path.Combine(DataDir, "cache", BitConverter.ToString(h.ComputeHash(Encoding.UTF8.GetBytes(url))).Replace("-", "").ToLowerInvariant() + ".json");
+            if (!fresh && File.Exists(file) && DateTime.UtcNow - File.GetLastWriteTimeUtc(file) < CacheFor) text = File.ReadAllText(file);
+        }
+        catch { text = null; }
+        if (text == null)
+        {
+            try
+            {
+                text = GetText(url);
+                if (file != null) try { Directory.CreateDirectory(Path.GetDirectoryName(file)); File.WriteAllText(file, text, new UTF8Encoding(false)); } catch { }
+            }
+            catch
+            {
+                string old = null;
+                try { if (file != null && File.Exists(file)) old = File.ReadAllText(file); } catch { }
+                if (old == null) throw;
+                text = old;   // offline / host busy: the last list we had
+            }
+        }
+        object[] list = Json.DeserializeObject(text) as object[];
         if (list == null) throw new Exception("Unexpected answer from " + url);
         return list;
     }

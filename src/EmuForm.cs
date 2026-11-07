@@ -602,7 +602,7 @@ class EmuForm : Form
 
     public EmuForm()
     {
-        Text = APP + (Core.Cfg.Sandbox ? "  -  TEST" : "");
+        Text = APP + (Core.Cfg.Sandbox && Demo == null ? "  -  TEST" : "");   // --demo: screenshots, without the test label
         try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
         Font = new Font("Segoe UI", 9.5f);
         AutoScaleMode = AutoScaleMode.None;   // DoLayout scales by the screen DPI itself
@@ -617,7 +617,7 @@ class EmuForm : Form
         // header
         try { using (Stream s = typeof(EmuForm).Assembly.GetManifestResourceStream("app.png")) if (s != null) logoBox.Image = new Bitmap(s); } catch { }
         logoBox.SizeMode = PictureBoxSizeMode.Zoom;
-        head.Text = Core.Cfg.Sandbox ? APP + " (test)" : APP; head.Font = Theme.Header ?? new Font("Segoe UI Semibold", 16f); head.AutoEllipsis = true;
+        head.Text = Core.Cfg.Sandbox && Demo == null ? APP + " (test)" : APP; head.Font = Theme.Header ?? new Font("Segoe UI Semibold", 16f); head.AutoEllipsis = true;
         addEmu.Text = "Add emulator fork"; addEmu.Click += delegate { ShowRecommended(false); };
         Outline(addEmu, Theme.Accent);
         menuBtn.Text = "..."; menuBtn.Click += delegate { MainMenu().Show(menuBtn, new Point(0, menuBtn.Height)); };
@@ -642,7 +642,7 @@ class EmuForm : Form
         cardsHost.Controls.Add(emptyCard);
         // status line
         footer.AutoEllipsis = true; footer.ForeColor = Color.DimGray;
-        checkLink.Text = "Check for updates"; checkLink.LinkClicked += delegate { CheckAll(); };
+        checkLink.Text = "Check for updates"; checkLink.LinkClicked += delegate { CheckAll(true); };   // by hand: always ask the hosts now
         logLink.Text = "Show log"; logLink.LinkClicked += delegate { ShowLog(); };
         buildsPage.Controls.AddRange(new Control[] { footer, checkLink, logLink });
         // Eglantine main (the upstream repo) always comes first; the rest keep their order
@@ -726,6 +726,7 @@ class EmuForm : Form
         else if (n == "remove" && c != null) RemoveFork(c);
         else if (n == "update" && c != null) CheckOne(c, delegate { if (c.Rel != null) DoUpdate(c); });
         else if (n == "log") ShowLog();
+        else if (n == "main") { }   // just the main window
         else if ((n == "versions" || n == "versionsopen") && c != null) ChooseVersion(c);
     }
 
@@ -770,7 +771,7 @@ class EmuForm : Form
     {
         List<object> items = IsBusy ? new List<object>() : new List<object> { "Add from link...", (Action)AddFork, "Shared data...", (Action)SharedDialog, null };
         items.AddRange(new object[] {
-            "Check for updates", (Action)CheckAll, "Show log", (Action)ShowLog, "Open install folder", (Action)delegate { Explore(Core.Home); } });
+            "Check for updates", (Action)delegate { CheckAll(true); }, "Show log", (Action)ShowLog, "Open install folder", (Action)delegate { Explore(Core.Home); } });
         if (Core.Cfg.Sandbox) { items.Add(null); items.Add("Reset test"); items.Add((Action)ResetSandbox); }
         ContextMenuStrip m = MakeMenu(items.ToArray());
         // which manager this is (the same number Setup and Settings > Apps show)
@@ -989,8 +990,15 @@ class EmuForm : Form
 
     void SetFooter(string text, Color color) { footer.Text = text; footer.ForeColor = color; }
 
+    // What a failed release check tells the user: GitHub's hourly limit gets its own plain message.
+    static string CheckFailed(string err, string otherwise = "Couldn't check for updates.")
+    {
+        return err != null && (err.Contains("hourly limit") || err.Contains("rate limit")) ? "GitHub is busy. Try again in a few minutes." : otherwise;
+    }
+
     // ---- actions (one at a time, on a worker thread)
-    void CheckAll()
+    // fresh: ask the hosts now (the user clicked Check for updates); otherwise lists from the last 10 minutes are used
+    void CheckAll(bool fresh = false)
     {
         if (cards.Count == 0) { SetFooter("", Theme.Muted); return; }
         SetFooter("Checking for updates...", Theme.Muted);
@@ -1002,15 +1010,15 @@ class EmuForm : Form
             ThreadPool.QueueUserWorkItem(delegate
             {
                 Release r = null; string err = null;
-                try { r = Core.Latest(c.Def); } catch (Exception ex) { err = ex.Message; }
+                try { r = Core.Latest(c.Def, fresh); } catch (Exception ex) { err = ex.Message; }
                 UI(delegate
                 {
-                    c.Rel = r; c.CheckErr = err != null ? "Couldn't check for updates." : null; Refresh(c);
+                    c.Rel = r; c.CheckErr = err != null ? CheckFailed(err) : null; Refresh(c);
                     if (err != null) Log(c.Def.Name + ": update check failed: " + err);
                     if (--left == 0)
                     {
                         int upd = cards.Count(k => k.Rel != null && Installed(k.Def) && !Current(k));
-                        if (cards.Any(k => k.CheckErr != null)) SetFooter("Couldn't check for updates.", Theme.Danger);
+                        if (cards.Any(k => k.CheckErr != null)) SetFooter(cards.First(k => k.CheckErr != null).CheckErr, Theme.Danger);
                         else if (upd > 0) SetFooter(upd == 1 ? "1 update available" : upd + " updates available", Theme.Info);
                         else if (cards.Any(k => Installed(k.Def))) SetFooter("Everything is up to date", Theme.Success);
                         else SetFooter("", Theme.Muted);
@@ -1603,7 +1611,7 @@ class EmuForm : Form
                         {
                             if (here) { if (r != null) rels[d] = r; else Log(d.Name + ": update check failed: " + err); }   // added either way; the tick is the user's
                             else if (r != null) { rels[d] = r; if (!adopted[0]) { cb.Enabled = true; cb.Checked = first && knownDir == null; } }   // already on this PC: offer that, don't tick a second copy
-                            else { Log(d.Name + ": update check failed: " + err); if (!adopted[0]) { note.Text = "Can't connect right now."; note.ForeColor = Theme.Danger; } }
+                            else { Log(d.Name + ": update check failed: " + err); if (!adopted[0]) { note.Text = CheckFailed(err, "Can't connect right now."); note.ForeColor = Theme.Danger; } }
                         });
                     }
                     catch (InvalidOperationException) { }   // window closed meanwhile (ObjectDisposedException is one too)
@@ -1755,7 +1763,7 @@ class EmuForm : Form
             try { r = Core.Latest(c.Def); } catch (Exception ex) { err = ex.Message; }
             UI(delegate
             {
-                c.Rel = r; c.CheckErr = err != null ? "Couldn't check for updates." : null; Refresh(c);
+                c.Rel = r; c.CheckErr = err != null ? CheckFailed(err) : null; Refresh(c);
                 if (err != null) Log(c.Def.Name + ": update check failed: " + err);
                 if (after != null) after();
             });
@@ -1930,7 +1938,7 @@ class EmuForm : Form
                     {
                         if (!f.IsDisposed) f.BeginInvoke((MethodInvoker)delegate
                         {
-                            if (got == null) { Log(d.Name + ": couldn't list versions: " + err); status.Text = "Can't connect right now. Try again later."; status.ForeColor = Theme.Danger; return; }
+                            if (got == null) { Log(d.Name + ": couldn't list versions: " + err); status.Text = CheckFailed(err, "Can't connect right now. Try again later."); status.ForeColor = Theme.Danger; return; }
                             rels = got; recTag = rec;
                             int sel = Math.Max(0, rels.FindIndex(x => rec != null && string.Equals(x.Tag, rec, StringComparison.OrdinalIgnoreCase)));
                             for (int i = 0; i < rels.Count; i++)
@@ -2176,10 +2184,11 @@ class EmuForm : Form
         {
             try
             {
-                if (a[i] == "check")
+                if (a[i] == "check" || a[i] == "check-fresh")   // check-fresh: ask the hosts now, like the Check for updates link
                     foreach (EmuDef d in Core.Cfg.Emulators)
                     {
-                        Release r = Core.Latest(d); Manifest m = Core.LoadManifest(d.Dir);
+                        Release r; try { r = Core.Latest(d, a[i] == "check-fresh"); } catch (Exception ex) { log(d.Id + ": ERROR " + ex.Message + " -> shown as: " + CheckFailed(ex.Message)); continue; }
+                        Manifest m = Core.LoadManifest(d.Dir);
                         log(d.Id + ": installed=" + (Core.Describe(d) ?? "none") + " latest=" + r.Tag + " asset=" + r.Asset + " size=" + r.Size + " sha256=" + (r.Sha256 ?? "none") +
                             " current=" + (m != null && m.Tag == r.Tag));
                     }
