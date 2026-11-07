@@ -1,0 +1,8 @@
+# built files (the installer goes in GitHub Releases, not the repository)
+*.exe
+dist/
+sandbox/
+*.log
+# screenshots and the icon source picture
+/*.png
+!/docs/*.png
