@@ -4,6 +4,8 @@ Install, update and launch Switch 2 emulators on Windows, from one small window.
 
 Made by **Riskbreak** (Discord).
 
+![The main window with three emulators installed](docs/main.png)
+
 ## What it does
 
 - **Installs** Eglantine Main, PokeDinner and Lichii, or any other fork from a GitHub or Gitea link.
@@ -13,7 +15,27 @@ Made by **Riskbreak** (Discord).
 - **Shares keys, firmware and saves** between your emulators if you want (one tick box).
 - **Finds emulators you already have**, so nothing is downloaded twice.
 
+## Screenshots
+
+**First start:** tick the emulators you want, then click Install.
+
+![Welcome window](docs/welcome.png)
+
+**Already have them?** Emulators that are already in the folder are added without downloading them again.
+
+![Welcome window with emulators already installed](docs/welcome-already-installed.png)
+
+**Choose any version** from each emulator's "..." menu.
+
+![Choose version list](docs/choose-version.png)
+
+**No emulators yet:** one click to pick some.
+
+![Main window with no emulators](docs/no-emulators.png)
+
 ## Install
+
+![Setup](docs/setup.png)
 
 1. Go to [Releases](../../releases) and download the latest `NS2EmulatorManager.zip`.
 2. Extract the whole zip (right-click it, then **Extract All**).
