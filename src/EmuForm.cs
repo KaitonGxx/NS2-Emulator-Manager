@@ -737,6 +737,7 @@ class EmuForm : Form
         else if (n == "log") ShowLog();
         else if (n == "main") { }   // just the main window
         else if ((n == "versions" || n == "versionsopen") && c != null) ChooseVersion(c);
+        else if (n == "share" && c != null) ToggleShare(c);
     }
 
     void ShowLog()
@@ -1007,7 +1008,7 @@ class EmuForm : Form
                 string why; joinWhy.TryGetValue(d.Id, out why);
                 List<string> open = cards.Where(k => Installed(k.Def) && Core.Running(k.Def).Count > 0 &&
                                                      (k == c || UserData.HostItems.Any(i => UserData.StateOf(k.Def, i) != UserData.State.Off))).Select(k => k.Def.Name).ToList();
-                c.Data.Text = UserData.HostItems.Any(i => UserData.LinkedElsewhere(d, i)) ? "Not sharing: it uses a folder you linked yourself."
+                c.Data.Text = UserData.OddLinks(d) ? "Not sharing: it uses a folder link the manager didn't make."
                             : open.Count > 0 ? "Not sharing yet: close " + string.Join(" and ", open) + " first."
                             : why != null ? "Not sharing yet: " + why + "."
                             : "Not sharing yet.";
@@ -1328,8 +1329,16 @@ class EmuForm : Form
             return;
         }
         if (open.Count > 0) { Tell("Share data", "Close " + string.Join(" and ", open) + " first."); return; }
-        if (UserData.HostItems.Any(i => UserData.LinkedElsewhere(d, i))) { Tell("Share data", d.Name + "'s data is in a folder you linked yourself, so it can't be shared."); return; }
-        if (Ask("Share " + d.Name + "'s data", "All your emulators will use " + d.Name + "'s keys, firmware and saves, so progress shows up in all of them. Saves for other games are kept.\r\n\r\nIf two emulators have a save for the same game, " + d.Name + "'s is used and the other is kept as a backup.", "Share", "Cancel") != 0) return;
+        if (UserData.OddLinks(d)) { Tell("Share data", d.Name + "'s data uses a folder link the manager didn't make, so it can't be shared."); return; }
+        // data linked to another shared folder (an earlier install in another place) is copied in first; say so here
+        List<EmuCard> foreign = cards.Where(k => Installed(k.Def) && UserData.IsPortable(k.Def) && UserData.ForeignLinks(k.Def).Count > 0).ToList();
+        string copyNote = "";
+        if (foreign.Count > 0)
+        {
+            string names = string.Join(" and ", foreign.Select(k => k.Def.Name)), root = UserData.ForeignRoot(foreign[0].Def);
+            copyNote = "\r\n\r\n" + names + (foreign.Count == 1 ? " uses" : " use") + " data from another folder (" + root + "), probably from an earlier install. It's copied in first; that folder isn't changed.";
+        }
+        if (Ask("Share " + d.Name + "'s data", "All your emulators will use " + d.Name + "'s keys, firmware and saves, so progress shows up in all of them. Saves for other games are kept.\r\n\r\nIf two emulators have a save for the same game, " + d.Name + "'s is used and the other is kept as a backup." + copyNote, "Share", "Cancel") != 0) return;
         List<EmuDef> all = cards.Where(k => Installed(k.Def)).Select(k => k.Def).ToList();   // not-portable ones are named as left out
         if (!all.Contains(d)) all.Insert(0, d);
         List<string> left = new List<string>();

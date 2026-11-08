@@ -167,6 +167,80 @@ public static class UserData
         return false;
     }
 
+    // e's paths (keys, firmware, saves) that are folder links to an existing folder other than this install's shared
+    // one: path -> target. Typically a shared folder of an earlier install in another place.
+    public static Dictionary<string, string> ForeignLinks(EmuDef e)
+    {
+        Dictionary<string, string> d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (!IsPortable(e)) return d;
+        foreach (Item it in HostItems)
+            foreach (string rel in it.Paths)
+            {
+                string b = Path.Combine(UserDir(e), rel), t = JunctionTarget(b);
+                if (t == null || t == "(another kind of link)" || !Directory.Exists(t)) continue;
+                if (string.Equals(Full(t), Full(Path.Combine(SharedRoot, rel)), StringComparison.OrdinalIgnoreCase)) continue;
+                d[b] = Full(t);
+            }
+        return d;
+    }
+
+    // A link the manager can't take over: another kind of link, or one whose folder is gone.
+    public static bool OddLinks(EmuDef e)
+    {
+        if (!IsPortable(e)) return false;
+        Dictionary<string, string> f = ForeignLinks(e);
+        foreach (Item it in HostItems)
+            foreach (string rel in it.Paths)
+            {
+                string b = Path.Combine(UserDir(e), rel), t = JunctionTarget(b);
+                if (t == null || f.ContainsKey(b)) continue;
+                if (t != "(another kind of link)" && string.Equals(Full(t), Full(Path.Combine(SharedRoot, rel)), StringComparison.OrdinalIgnoreCase)) continue;
+                return true;
+            }
+        return false;
+    }
+    // The folder (for messages) e's foreign links lead to: "...\Shared data" when they point into one.
+    public static string ForeignRoot(EmuDef e)
+    {
+        string t = ForeignLinks(e).Values.FirstOrDefault();
+        if (t == null) return null;
+        int i = t.IndexOf("\\" + SHARED + "\\", StringComparison.OrdinalIgnoreCase);
+        return i >= 0 ? t.Substring(0, i + SHARED.Length + 1) : t;
+    }
+
+    // Replaces e's foreign links with a copy of what they point to, so the data becomes e's own. The copy is made and
+    // checked while the link is still there; the other folder is never changed.
+    public static void BringHome(EmuDef e, Action<string> log)
+    {
+        Dictionary<string, string> f = ForeignLinks(e);
+        if (f.Count == 0) return;
+        CheckFolders(e);
+        if (Core.Running(e).Count > 0) throw new Exception("Close " + e.Name + " first.");
+        long need = 0;
+        foreach (string t in f.Values) { if (FindReparse(t) != null) throw new Exception(FindReparse(t) + " is a link; not copying it."); need += Count(t)[1]; }
+        try
+        {
+            DriveInfo di = new DriveInfo(Path.GetPathRoot(Full(UserDir(e))));
+            if (di.AvailableFreeSpace < need + (64L << 20)) throw new Exception("Not enough free space on " + di.Name.TrimEnd('\\') + ".");
+        }
+        catch (ArgumentException) { }
+        foreach (KeyValuePair<string, string> p in f)
+        {
+            string b = p.Key, t = p.Value, tmp = b + ".copying";
+            if (Directory.Exists(tmp)) DeleteTree(tmp);
+            try
+            {
+                long[] n = CopyTree(t, tmp), check = Count(tmp);
+                if (check[0] != n[0] || check[1] != n[1]) throw new Exception("Copying " + t + " didn't match; nothing changed.");
+            }
+            catch { try { if (Directory.Exists(tmp)) DeleteTree(tmp); } catch { } throw; }
+            RemoveJunction(b);
+            try { Directory.Move(tmp, b); }
+            catch { try { CreateJunction(b, t); DeleteTree(tmp); } catch { } throw; }
+            log(e.Name + ": " + b.Substring(UserDir(e).Length + 1) + " copied in from " + t + " (that folder isn't changed).");
+        }
+    }
+
     // e and x use the same folder for some path of the item (shared now, partly shared, an old shared folder or a
     // link made by hand).
     static bool SameData(EmuDef e, EmuDef x, Item it)
@@ -369,7 +443,7 @@ public static class UserData
     {
         if (!IsPortable(k)) return "keeps its saves outside its folder";
         if (Core.Running(k).Count > 0) return "close it first";
-        if (HostItems.Any(i => LinkedElsewhere(k, i))) return "uses a folder you linked yourself";
+        if (OddLinks(k)) return "uses a folder link the manager didn't make";
         try { CheckFolders(k); CheckLinks(k); } catch (Exception ex) { return ex.Message; }
         return null;
     }
@@ -393,6 +467,7 @@ public static class UserData
     {
         string hp = SharingProblem(host);
         if (hp != null) throw new Exception(host.Name + ": " + hp + ".");
+        BringHome(host, log);   // data linked to another (older) shared folder becomes its own first
         Dictionary<EmuDef, string> skip = new Dictionary<EmuDef, string>();
         foreach (EmuDef k in all) if (k != host) { string p = SharingProblem(k); if (p != null) skip[k] = p; }
         foreach (Item it in HostItems)
@@ -423,6 +498,7 @@ public static class UserData
     {
         string p = SharingProblem(k);
         if (p != null) throw new Exception(p.StartsWith("close") ? "Close " + k.Name + " first." : p);
+        BringHome(k, log);
         foreach (Item it in HostItems)
         {
             if (StateOf(k, it) == State.On) continue;
