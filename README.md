@@ -12,8 +12,10 @@ Made by **Riskbreak** (Discord).
 - **Updates** with one click. The version you replace is kept, so you can go back.
 - **Choose any version** from a list of every release (each card's "..." menu).
 - **Keeps your saves safe.** Each emulator uses its own folder; nothing goes in `%APPDATA%`.
-- **Shares keys, firmware and saves** between your emulators if you want (one tick box).
+- **Share data with other emulators:** tick it on one emulator and all of them use its keys, firmware and saves, so
+  your progress follows you. Saves for different games are combined; nothing is deleted.
 - **Finds emulators you already have**, so nothing is downloaded twice.
+- **Updates itself** from this page when a new version is out.
 
 ## Screenshots
 
