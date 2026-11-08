@@ -863,7 +863,7 @@ class EmuForm : Form
         {
             heading("Other places");
             foreach (var o in other.GroupBy(o => o.Value, StringComparer.OrdinalIgnoreCase).Select(g => g.First()))
-                place(o.Key, "Where emulators keep saves when they don't have their own folder. The manager never changes it (" + games(UserData.CountGames(o.Value)) + ").", o.Value);
+                place(o.Key, "Used when an emulator has no folder of its own. Never changed by the manager (" + games(UserData.CountGames(o.Value)) + ").", o.Value);
         }
 
         // the situations, plainly
