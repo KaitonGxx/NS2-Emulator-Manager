@@ -37,7 +37,9 @@ public class Config
     public List<string> NoInstallPrompt { get; set; }   // ids the user told "don't ask again" about installing
     public bool Sandbox { get; set; }           // test environment (--sandbox DIR): shown in the title, can be reset
     public List<string> ShareNew { get; set; }  // UserData item keys new builds share from the start (null = none)
-    public string ShareHost { get; set; }       // id of the emulator whose data all of them use (its card is ticked); null = no sharing
+    public string ShareHost { get; set; }
+    public Dictionary<string, List<string>> ShareBackups { get; set; }   // id -> Set aside folders with its own saves (this sharing), for "Go back"
+    public Dictionary<string, List<string>> ShareMerged { get; set; }    // id -> "its path|shared path" of saves/DLC it added to the shared ones       // id of the emulator whose data all of them use (its card is ticked); null = no sharing
     public List<string> NoSetupReminder { get; set; }   // emulator ids whose card doesn't say "Next: add your keys / firmware"
     public string Window { get; set; }          // main window as the user left it: "x,y,width,height,maximized" (screen pixels)
 }

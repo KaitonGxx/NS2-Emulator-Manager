@@ -271,8 +271,9 @@ public static class UserData
     // different data), "shared" (keep the shared copy; the build's goes to Set aside) or "build" (keep the build's; the
     // shared copy goes to Set aside). When only the build has data, it is moved into the shared folder. Everything is
     // checked first; if a step fails, what that step moved is put back.
-    public static void Share(EmuDef e, Item it, string prefer, Action<string> log) { Share(e, it, prefer, false, log); }
-    static void Share(EmuDef e, Item it, string prefer, bool othersMayRun, Action<string> log)
+    // Returns the Set aside folder that got e's own copy (null when nothing of e's was set aside).
+    public static string Share(EmuDef e, Item it, string prefer, Action<string> log) { return Share(e, it, prefer, false, log); }
+    static string Share(EmuDef e, Item it, string prefer, bool othersMayRun, Action<string> log)
     {
         CheckFolders(e);
         BlockIfRunning(e, othersMayRun ? null : it);
@@ -291,6 +292,7 @@ public static class UserData
         }
         CheckLinks(e);
         string asideB = null, asideS = null;   // one Set aside folder per side for this item, keeping each path's place
+        List<Action> undo = new List<Action>();   // paths of this item already done: put back too when a later one fails
         foreach (string rel in it.Paths)
         {
             string b = Path.Combine(user, rel), s = Path.Combine(SharedRoot, rel);
@@ -320,21 +322,33 @@ public static class UserData
                 CreateJunction(b, s);
             }
             catch
-            {   // put back what this step moved, newest first
-                try
-                {
-                    if (JunctionTarget(b) != null) RemoveDirectory(b);
-                    if (bToS && Directory.Exists(s)) MoveTree(s, b, log);
-                    if (movedS != null && Directory.Exists(movedS)) { if (Directory.Exists(s) && !HasFiles(s)) DeleteEmptyTree(s); MoveTree(movedS, s, log); }
-                    if (movedB != null && Directory.Exists(movedB)) MoveTree(movedB, b, log);
-                    if (bWasEmpty) Directory.CreateDirectory(b);
-                    if (sWasEmpty || !Directory.Exists(s)) Directory.CreateDirectory(s);   // other builds' links point here
-                }
-                catch (Exception ex2) { log("Could not put everything back for " + rel + ": " + ex2.Message); }
+            {   // put back what this step moved, then the paths of this item already done: newest first
+                PutBack(b, s, movedB, movedS, bToS, bWasEmpty, sWasEmpty, rel, log);
+                for (int i = undo.Count - 1; i >= 0; i--) undo[i]();
                 throw;
+            }
+            {
+                string b0 = b, s0 = s, mb = movedB, ms = movedS, r0 = rel; bool bts = bToS, bwe = bWasEmpty, swe = sWasEmpty;
+                undo.Add(() => PutBack(b0, s0, mb, ms, bts, bwe, swe, r0, log));
             }
             log(e.Name + ": " + rel + " -> " + s);
         }
+        return asideB;
+    }
+
+    // Undoes one path of Share: the link goes, and what was moved goes back where it was.
+    static void PutBack(string b, string s, string movedB, string movedS, bool bToS, bool bWasEmpty, bool sWasEmpty, string rel, Action<string> log)
+    {
+        try
+        {
+            if (JunctionTarget(b) != null) RemoveDirectory(b);
+            if (bToS && Directory.Exists(s)) MoveTree(s, b, log);
+            if (movedS != null && Directory.Exists(movedS)) { if (Directory.Exists(s) && !HasFiles(s)) DeleteEmptyTree(s); MoveTree(movedS, s, log); }
+            if (movedB != null && Directory.Exists(movedB)) MoveTree(movedB, b, log);
+            if (bWasEmpty || !Directory.Exists(b)) Directory.CreateDirectory(b);
+            if (sWasEmpty || !Directory.Exists(s)) Directory.CreateDirectory(s);   // other builds' links point here
+        }
+        catch (Exception ex2) { log("Could not put everything back for " + rel + ": " + ex2.Message); }
     }
 
     // Stops sharing one item: the build gets its own copy of the shared data (the shared folder keeps it for the other
@@ -513,7 +527,8 @@ public static class UserData
     static void JoinItem(EmuDef k, Item it, Action<string> log)
     {
         List<KeyValuePair<string, string>> moved = it.Key == "saves" ? MergeSaves(k, log) : new List<KeyValuePair<string, string>>();
-        try { Share(k, it, "shared", log); }
+        string aside;
+        try { aside = Share(k, it, "shared", log); }
         catch
         {
             for (int i = moved.Count - 1; i >= 0; i--)
@@ -526,6 +541,34 @@ public static class UserData
                 catch (Exception ex2) { log("Could not move back " + moved[i].Value + ": " + ex2.Message); }
             throw;
         }
+        if (it.Key == "saves") Remember(k, aside, moved);
+    }
+
+    // What "Go back" needs when sharing stops: the Set aside folder with k's own saves, and what k added to the shared
+    // saves (its path | the shared path). Kept in the config (saved by the caller) until sharing stops.
+    static void Remember(EmuDef k, string aside, List<KeyValuePair<string, string>> moved)
+    {
+        lock (Core.Cfg)
+        {
+            if (Core.Cfg.ShareBackups == null) Core.Cfg.ShareBackups = new Dictionary<string, List<string>>();
+            if (Core.Cfg.ShareMerged == null) Core.Cfg.ShareMerged = new Dictionary<string, List<string>>();
+            if (!Core.Cfg.ShareBackups.ContainsKey(k.Id)) Core.Cfg.ShareBackups[k.Id] = new List<string>();
+            if (!Core.Cfg.ShareMerged.ContainsKey(k.Id)) Core.Cfg.ShareMerged[k.Id] = new List<string>();
+            if (aside != null) Core.Cfg.ShareBackups[k.Id].Add(aside);
+            string u = UserDir(k);
+            foreach (KeyValuePair<string, string> m in moved)
+                if (m.Key.StartsWith(u + "\\", StringComparison.OrdinalIgnoreCase) && m.Value.StartsWith(SharedRoot + "\\", StringComparison.OrdinalIgnoreCase))
+                    Core.Cfg.ShareMerged[k.Id].Add(m.Key.Substring(u.Length + 1) + "|" + m.Value.Substring(SharedRoot.Length + 1));
+        }
+    }
+
+    // Can k "go back" to its own saves from before sharing (something was remembered for it)?
+    public static bool CanGoBack(EmuDef k)
+    {
+        List<string> a = null, m = null;
+        if (Core.Cfg.ShareBackups != null) Core.Cfg.ShareBackups.TryGetValue(k.Id, out a);
+        if (Core.Cfg.ShareMerged != null) Core.Cfg.ShareMerged.TryGetValue(k.Id, out m);
+        return (a != null && a.Any(Directory.Exists)) || (m != null && m.Count > 0);
     }
 
     const string DEVICE = "00000000000000000000000000000000";   // device saves (not a player profile)
@@ -593,12 +636,104 @@ public static class UserData
         if (string.Equals(Path.GetPathRoot(Full(from)), Path.GetPathRoot(Full(to)), StringComparison.OrdinalIgnoreCase)) File.Move(from, to);
         else { File.Copy(from, to, false); if (new FileInfo(to).Length != new FileInfo(from).Length) { File.Delete(to); throw new IOException("Copying " + from + " didn't match."); } File.Delete(from); }
     }
-    // Unticked: sharing stops; every build gets its own copy of the latest shared data.
-    public static void StopSharing(List<EmuDef> all, Action<string> log)
+    // Unticked: sharing stops. host keeps (a copy of) the latest data. goBack false: every other build gets a copy of
+    // the latest too. goBack true: the others get their own saves from before sharing back (their Set aside copy, plus
+    // what they added to the shared saves, as it is now); their keys and firmware stay the latest. The Set aside
+    // copies stay where they are.
+    public static void StopSharing(EmuDef host, List<EmuDef> all, bool goBack, Action<string> log)
     {
         foreach (EmuDef k in all)
             foreach (Item it in Items)
-                if (StateOf(k, it) != State.Off && !LinkedElsewhere(k, it)) Unshare(k, it, log);
+            {
+                if (StateOf(k, it) == State.Off || LinkedElsewhere(k, it)) continue;
+                if (goBack && k != host && it.Key == "saves" && CanGoBack(k)) RestoreOwnSaves(k, log);
+                else Unshare(k, it, log);
+            }
+        lock (Core.Cfg) { Core.Cfg.ShareBackups = null; Core.Cfg.ShareMerged = null; }
+    }
+    public static void StopSharing(List<EmuDef> all, Action<string> log) { StopSharing(null, all, false, log); }
+
+    // Why sharing can't be stopped right now (plain words), or null: an emulator is open, or there's no room for the
+    // copies every emulator gets.
+    public static string StopProblem(List<EmuDef> all)
+    {
+        List<string> open = all.Where(k => Core.Running(k).Count > 0).Select(k => k.Name).ToList();
+        if (open.Count > 0) return "Close " + string.Join(" and ", open) + " first.";
+        long one = 0;
+        foreach (Item it in HostItems) foreach (string rel in it.Paths) { string d = Path.Combine(SharedRoot, rel); if (Directory.Exists(d)) one += Count(d)[1]; }
+        long need = one * all.Count(k => HostItems.Any(i => StateOf(k, i) != State.Off));
+        try
+        {
+            DriveInfo di = new DriveInfo(Path.GetPathRoot(Full(SharedRoot)));
+            if (di.AvailableFreeSpace < need + (64L << 20)) return "There isn't enough free space on " + di.Name.TrimEnd('\\') + " for every emulator's copy.";
+        }
+        catch { }
+        return null;
+    }
+
+    // k's saves as they were before it joined: built next to its links, checked, then swapped in for them.
+    static void RestoreOwnSaves(EmuDef k, Action<string> log)
+    {
+        Item saves = Find("saves");
+        CheckFolders(k);
+        BlockIfRunning(k, saves);
+        string u = UserDir(k);
+        List<string> asides = Core.Cfg.ShareBackups != null && Core.Cfg.ShareBackups.ContainsKey(k.Id) ? Core.Cfg.ShareBackups[k.Id] : new List<string>();
+        List<string> merged = Core.Cfg.ShareMerged != null && Core.Cfg.ShareMerged.ContainsKey(k.Id) ? Core.Cfg.ShareMerged[k.Id] : new List<string>();
+        Dictionary<string, string> tmp = new Dictionary<string, string>();
+        try
+        {
+            foreach (string rel in saves.Paths)
+            {
+                string t = Path.Combine(u, rel) + ".restoring";
+                if (Directory.Exists(t)) DeleteTree(t);
+                Directory.CreateDirectory(t); tmp[rel] = t;
+                foreach (string a in asides)
+                    if (Directory.Exists(Path.Combine(a, rel))) CopyNew(Path.Combine(a, rel), t);
+            }
+            foreach (string m in merged)
+            {   // what it added to the shared saves comes back with its latest progress
+                string[] p = m.Split('|');
+                if (p.Length != 2) continue;
+                string rel = saves.Paths.FirstOrDefault(r => p[0].StartsWith(r + "\\", StringComparison.OrdinalIgnoreCase));
+                if (rel == null) continue;
+                string src = Path.Combine(SharedRoot, p[1]), dst = Path.Combine(tmp[rel], p[0].Substring(rel.Length + 1));
+                if (Directory.Exists(src)) CopyNew(src, dst);
+                else if (File.Exists(src) && !File.Exists(dst)) { Directory.CreateDirectory(Path.GetDirectoryName(dst)); File.Copy(src, dst, false); }
+            }
+        }
+        catch { foreach (string t in tmp.Values) try { DeleteTree(t); } catch { } throw; }
+        List<KeyValuePair<string, string>> swapped = new List<KeyValuePair<string, string>>();   // rel -> the link it had
+        try
+        {
+            foreach (string rel in saves.Paths)
+            {
+                string b = Path.Combine(u, rel);
+                string target = JunctionTarget(b);
+                if (target != null) RemoveJunction(b);
+                else if (Directory.Exists(b)) { string aside = NewAside(k.Name + " - before going back"); SetAside(b, aside, rel, log); }
+                try { Directory.Move(tmp[rel], b); }
+                catch { try { if (target != null && !Directory.Exists(b)) CreateJunction(b, target); } catch { } throw; }
+                swapped.Add(new KeyValuePair<string, string>(rel, target));
+            }
+        }
+        catch
+        {   // the paths already swapped get their link back, so the build stays as it was
+            foreach (KeyValuePair<string, string> sw in swapped)
+                try { string b = Path.Combine(u, sw.Key); Directory.Move(b, tmp[sw.Key]); if (sw.Value != null) CreateJunction(b, sw.Value); }
+                catch (Exception ex2) { log("Could not put back " + sw.Key + ": " + ex2.Message); }
+            foreach (string t in tmp.Values) try { if (Directory.Exists(t)) DeleteTree(t); } catch { }
+            throw;
+        }
+        log(k.Name + ": its own saves from before sharing are back (the shared copies keep the latest).");
+    }
+
+    // Copies src into dst, leaving files dst already has as they are.
+    static void CopyNew(string src, string dst)
+    {
+        Directory.CreateDirectory(dst);
+        foreach (string f in Directory.GetFiles(src)) { string to = Path.Combine(dst, Path.GetFileName(f)); if (!File.Exists(to)) File.Copy(f, to, false); }
+        foreach (string d in Directory.GetDirectories(src)) if (!IsReparse(d)) CopyNew(d, Path.Combine(dst, Path.GetFileName(d)));
     }
 
     // The items the card's share tick shares.

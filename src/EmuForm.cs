@@ -1274,7 +1274,12 @@ class EmuForm : Form
                 foreach (EmuCard k in todo)
                     try { UserData.JoinOne(k.Def, log); }
                     catch (Exception ex) { failed[k.Def.Id] = UserData.PlainReason(ex); log(k.Def.Name + " didn't join the shared data yet: " + ex.Message); }
-            }, delegate { foreach (var f in failed) joinWhy[f.Key] = f.Value; RefreshAll(); });
+            }, delegate
+            {
+                foreach (var f in failed) joinWhy[f.Key] = f.Value;
+                try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save: " + ex.Message); }   // what "Go back" needs
+                RefreshAll();
+            });
         });
     }
 
@@ -1286,7 +1291,8 @@ class EmuForm : Form
         {
             bool changed = false;
             if (Core.Cfg.ShareHost != null && !Core.Cfg.Emulators.Any(x => x.Id == Core.Cfg.ShareHost)) { Core.Cfg.ShareHost = null; changed = true; }
-            if (Core.Cfg.ShareHost == null)
+            bool stopping = Core.Cfg.ShareBackups != null || Core.Cfg.ShareMerged != null;   // a stop that didn't finish: don't turn sharing back on
+            if (Core.Cfg.ShareHost == null && !stopping)
             {
                 EmuCard full = cards.FirstOrDefault(k => Installed(k.Def) && UserData.IsPortable(k.Def) && UserData.HostItems.All(i => UserData.StateOf(k.Def, i) == UserData.State.On));
                 if (full != null) { Core.Cfg.ShareHost = full.Def.Id; Core.Cfg.ShareNew = UserData.HostItems.Select(i => i.Key).ToList(); changed = true; Log("Sharing was on: " + full.Def.Name + " is ticked."); }
@@ -1312,10 +1318,27 @@ class EmuForm : Form
         List<string> open = inst.Where(k => Core.Running(k.Def).Count > 0).Select(k => k.Def.Name).ToList();
         if (host == d)
         {
-            if (Ask("Stop sharing", "Stop sharing data? Each emulator keeps its own copy of the current keys, firmware and saves.", "Stop sharing", "Cancel") != 0) return;
+            // the ticked one always keeps the latest; the others keep the latest too, or go back to their own saves
+            List<EmuCard> others = inst.Where(k => k.Def != d && UserData.HostItems.Any(i => UserData.StateOf(k.Def, i) != UserData.State.Off)).ToList();
+            List<EmuCard> can = others.Where(k => UserData.CanGoBack(k.Def)).ToList(), cannot = others.Where(k => !can.Contains(k)).ToList();
+            bool canBack = can.Count > 0;
+            string only = can.Count > 0 && cannot.Count > 0   // shared since an older version: not every one has its old saves recorded
+                ? "\r\n\r\nOnly " + string.Join(" and ", can.Select(k => k.Def.Name)) + " can restore. " + string.Join(" and ", cannot.Select(k => k.Def.Name)) + (cannot.Count == 1 ? " keeps" : " keep") + " the latest saves."
+                : "";
+            int r = canBack
+                ? Ask("Stop sharing", "Stop sharing data? " + d.Name + " keeps the latest saves.\r\n\r\nShould the other emulators keep the latest saves too, or restore the saves they had before sharing?" + only, "Keep latest", "Restore", "Cancel")
+                : (Ask("Stop sharing", "Stop sharing data? Each emulator keeps its own copy of the current keys, firmware and saves.", "Stop sharing", "Cancel") == 0 ? 0 : -1);
+            if (r != 0 && r != 1) return;
+            bool goBack = r == 1;
             if (open.Count > 0) { Tell("Stop sharing", "Close " + string.Join(" and ", open) + " first."); return; }
             List<EmuDef> defs = inst.Select(k => k.Def).ToList();
-            Work(c, "Stopping sharing", (log, prog) => UserData.StopSharing(defs, log), delegate
+            string sp = UserData.StopProblem(defs);
+            if (sp != null) { Tell("Stop sharing", sp); return; }
+            // sharing counts as off from now on, so nothing joins again if stopping fails partway (the Restore records
+            // stay until it succeeds)
+            Core.Cfg.ShareHost = null; Core.Cfg.ShareNew = null;
+            try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save: " + ex.Message); }
+            Work(c, "Stopping sharing", (log, prog) => UserData.StopSharing(d, defs, goBack, log), delegate
             {
                 Core.Cfg.ShareHost = null; Core.Cfg.ShareNew = null;
                 try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save: " + ex.Message); }
@@ -1709,6 +1732,7 @@ class EmuForm : Form
             string msg = Core.Adopt(d, id);
             Log(msg); status("Added.");
             card = c ?? AddDef(d, null);   // recommended build: on the list from now on
+            if (Core.Cfg.ShareHost == null) { SharingFromOlderVersions(); RefreshAll(); }   // it already shares (an earlier install): tick a card
             if (c != null) { Refresh(c); CheckOne(c, null); }
         }
         catch (Exception ex)
@@ -1894,6 +1918,7 @@ class EmuForm : Form
         if (i >= list.Count)
         {
             addingFound--;
+            SharingFromOlderVersions(); RefreshAll();   // found emulators that already share: one card shows the tick
             then();
             JoinSharing(null);   // waits for the downloads, if any
             dupRetry = true; BeginInvoke((MethodInvoker)AskDuplicates);   // one of them may also be in another folder
@@ -2408,9 +2433,10 @@ class EmuForm : Form
                     log("host -> " + h.Id);
                     continue;
                 }
-                if (a[i] == "host-stop")
+                if (a[i] == "host-stop" || a[i] == "host-stop-back")   // test: untick; -back = the others go back to their own saves
                 {
-                    UserData.StopSharing(Core.Cfg.Emulators.Where(x => UserData.IsPortable(x)).ToList(), log);
+                    EmuDef hd = Core.Cfg.Emulators.FirstOrDefault(x => x.Id == Core.Cfg.ShareHost);
+                    UserData.StopSharing(hd, Core.Cfg.Emulators.Where(x => UserData.IsPortable(x)).ToList(), a[i] == "host-stop-back", log);
                     Core.Cfg.ShareHost = null; Core.Cfg.ShareNew = null; Core.SaveConfig();
                     log("sharing stopped");
                     continue;
