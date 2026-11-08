@@ -288,6 +288,7 @@ class EmuCard
     public Button Update = new Button(), Launch = new Button(), More = new Button();
     public LinkLabel Existing = new LinkLabel(), Next = new LinkLabel();   // "I already have it" / "Next: add your keys..."
     public FlatBar Bar = new FlatBar();
+    public CheckBox Share = new CheckBox();   // "Share this emulator's data": ticked on the one whose data all of them use
     public Release Rel;
     public string Err;            // short, plain message for the card after a failed job or launch (details go to the log)
     public string CheckErr;       // the update check failed
@@ -318,6 +319,8 @@ class EmuForm : Form
     readonly Label head = new Label(), footer = new Label();
     readonly PictureBox logoBox = new PictureBox();
     readonly DiscordTag credit = new DiscordTag();   // "made by" on Discord, next to the title
+    readonly LinkLabel mgrLink = new LinkLabel();     // "Update the manager to 1.2.14" when GitHub has a newer manager
+    Release mgrRel; Version mgrVer;
     readonly Button addEmu = new Button(), menuBtn = new Button(), logCopy = new Button();
     readonly LinkLabel checkLink = new LinkLabel(), logLink = new LinkLabel();
     readonly TextBox logBox = new TextBox();
@@ -624,6 +627,10 @@ class EmuForm : Form
         tips.SetToolTip(menuBtn, "More");
         buildsPage.Controls.AddRange(new Control[] { logoBox, head, addEmu, menuBtn, credit });
         tips.SetToolTip(credit, "Made by " + DiscordTag.NAME + " on Discord. Click to copy the name.");
+        mgrLink.Visible = false; mgrLink.TextAlign = ContentAlignment.MiddleRight; mgrLink.LinkBehavior = LinkBehavior.HoverUnderline;
+        mgrLink.LinkColor = mgrLink.ActiveLinkColor = mgrLink.VisitedLinkColor = Theme.Accent;
+        mgrLink.LinkClicked += delegate { UpdateManager(); };
+        buildsPage.Controls.Add(mgrLink);
         // games folder: one line
         gamesCard.Text = ""; gamesCard.Shift = 0;
         gamesLbl.AutoEllipsis = true;
@@ -647,6 +654,7 @@ class EmuForm : Form
         buildsPage.Controls.AddRange(new Control[] { footer, checkLink, logLink });
         // Eglantine main (the upstream repo) always comes first; the rest keep their order
         foreach (EmuDef d in Core.Cfg.Emulators.OrderBy(x => Core.IsMainRepo(x) ? 0 : 1)) cards.Add(MakeCard(d));
+        SharingFromOlderVersions();
 
         // log (its own window, made on first use)
         logBox.Multiline = true; logBox.ReadOnly = true; logBox.ScrollBars = ScrollBars.Vertical; logBox.WordWrap = true;
@@ -659,13 +667,14 @@ class EmuForm : Form
         DoLayout();
         Resize += delegate { DoLayout(); };
         // back from Explorer (keys copied in...): every card re-checks; a postponed question is asked now
-        Activated += delegate { if (!IsBusy) RefreshAll(); if (dupRetry && !IsBusy) BeginInvoke((MethodInvoker)AskDuplicates); };
+        Activated += delegate { if (!IsBusy) RefreshAll(); if (dupRetry && !IsBusy) BeginInvoke((MethodInvoker)AskDuplicates); if ((joinPending || joinWhy.Count > 0) && !IsBusy) { joinPending = false; joinWhy.Clear(); JoinSharing(null); } };
         // first start: the welcome list (nothing is on the list yet); afterwards the usual update check
         Shown += delegate
         {
             if (Core.Cfg.Sandbox && Demo != null) { BeginInvoke((MethodInvoker)RunDemo); CheckAll(); return; }
             if (Core.FirstRun) { Core.FirstRun = false; ShowRecommended(true); }
             CheckAll();
+            JoinSharing(null);   // one that didn't join before (the manager was closed or restarted) tries again
         };
         FormClosing += delegate (object s, FormClosingEventArgs e)
         {
@@ -769,9 +778,10 @@ class EmuForm : Form
 
     ContextMenuStrip MainMenu()
     {
-        List<object> items = IsBusy ? new List<object>() : new List<object> { "Add from link...", (Action)AddFork, "Shared data...", (Action)SharedDialog, null };
+        List<object> items = IsBusy ? new List<object>() : new List<object> { "Add from link...", (Action)AddFork, null };
         items.AddRange(new object[] {
             "Check for updates", (Action)delegate { CheckAll(true); }, "Show log", (Action)ShowLog, "Open install folder", (Action)delegate { Explore(Core.Home); } });
+        if (mgrRel != null && !IsBusy) { items.Insert(0, (Action)UpdateManager); items.Insert(0, "Update the manager to " + mgrVer); }
         if (Core.Cfg.Sandbox) { items.Add(null); items.Add("Reset test"); items.Add((Action)ResetSandbox); }
         ContextMenuStrip m = MakeMenu(items.ToArray());
         // which manager this is (the same number Setup and Settings > Apps show)
@@ -792,7 +802,6 @@ class EmuForm : Form
         if (free) { items.Add("Choose version..."); items.Add((Action)delegate { ChooseVersion(c); }); }
         if (free && inst && UserData.IsPortable(d)) { items.Add("Set up keys and firmware"); items.Add((Action)delegate { SetupHelp(c); }); }
         if (free && inst && !UserData.IsPortable(d)) { items.Add("Keep its saves in its own folder"); items.Add((Action)delegate { MakePortable(c); }); }
-        if (free && inst) { items.Add("Shared data..."); items.Add((Action)SharedDialog); }
         if (free && Core.Backups(d).Count > 0) { items.Add("Go back to previous version"); items.Add((Action)delegate { DoRestore(c); }); }
         if (free && !inst) { items.Add("I already have it"); items.Add((Action)delegate { UseExisting(c); }); }
         items.Add(null);
@@ -839,6 +848,8 @@ class EmuForm : Form
             credit.Font = Font; credit.Height = D(20);
             int crw; using (Graphics g = CreateGraphics()) crw = credit.PreferredWidth(g);
             credit.SetBounds(D(48), D(52), crw, D(20));
+            int mw = TextRenderer.MeasureText(mgrLink.Text, Font).Width + D(8);
+            mgrLink.SetBounds(pw - mw, D(56), mw, D(22));
             credit.BackColor = buildsPage.BackColor; credit.Invalidate();
         }
         int y = D(82);
@@ -890,7 +901,7 @@ class EmuForm : Form
             if (show) { ctl.SetBounds(D(24), ly, w - D(48), D(22)); ly += D(24); }
         };
         row(c.Note, c.Note.Text.Length > 0);
-        if (c.Note.Visible) c.Note.Width = w - D(96);   // leave room for the "..." button
+        if (c.Note.Visible) c.Note.Width = Math.Min(c.Note.Width, w - D(96));   // leave room for the "..." button
         row(c.State, true);
         row(c.Data, c.Data.Text.Length > 0);
         c.Next.Visible = c.NextKind != null && !c.Busy && !IsBusy;
@@ -909,6 +920,18 @@ class EmuForm : Form
             c.Existing.SetBounds(ex, last + D(8), ew, D(22));
         }
         int h = last + D(34) + D(18);
+        // the share tick: bottom right of the card, beside the buttons (on a line of its own when the card is narrow)
+        c.Share.Visible = Installed(c.Def) && UserData.IsPortable(c.Def);
+        if (c.Share.Visible)
+        {
+            int sw = Math.Min(w - D(40), TextRenderer.MeasureText(c.Share.Text, Font).Width + D(34));
+            int sx = w - D(20) - sw, right = D(24);
+            foreach (Control b in bs) if (b.Top == last) right = Math.Max(right, b.Right);
+            if (c.Existing.Visible && c.Existing.Top >= last) right = Math.Max(right, c.Existing.Right);
+            c.Share.BackColor = Theme.Card; c.Share.ForeColor = Theme.Text;
+            if (sx > right + D(16)) c.Share.SetBounds(sx, last + D(4), sw, D(26));
+            else { c.Share.SetBounds(Math.Max(D(22), sx), last + D(34) + D(12), sw, D(26)); h = c.Share.Bottom + D(14); }
+        }
         c.Box.SetBounds(0, y, w, h);
         c.Box.Invalidate();
         return h;
@@ -927,7 +950,11 @@ class EmuForm : Form
         Outline(c.Update, Theme.Accent); Outline(c.Launch, Theme.Accent);
         tips.SetToolTip(c.More, "More");
         c.Existing.Text = "I already have it";
-        c.Box.Controls.AddRange(new Control[] { c.Note, c.More, c.State, c.Data, c.Next, c.Bar, c.Launch, c.Update, c.Existing, c.Ver });
+        c.Share.Text = "Share data with other emulators"; c.Share.AutoCheck = false;   // its state comes from Refresh
+        c.Share.Click += delegate { ToggleShare(c); };
+        tips.SetToolTip(c.Share, "Your other emulators use this one's keys, firmware and saves, so progress shows up in all of them. Their own data is kept as a backup.");
+        StyleCheck(c.Share);
+        c.Box.Controls.AddRange(new Control[] { c.Note, c.More, c.State, c.Data, c.Next, c.Bar, c.Launch, c.Update, c.Existing, c.Ver, c.Share });
         cardsHost.Controls.Add(c.Box);
 
         c.Update.Click += delegate { DoUpdate(c); };
@@ -967,7 +994,28 @@ class EmuForm : Form
 
         bool portable = installed && UserData.IsPortable(d);
         List<UserData.Item> shared = portable ? UserData.SharedItems(d) : new List<UserData.Item>();
-        c.Data.Text = shared.Count > 0 ? "Shared with your other emulators: " + string.Join(", ", shared.Select(i => i.Label.ToLower())) : "";
+        EmuDef hostDef = Core.Cfg.ShareHost == null ? null : Core.Cfg.Emulators.FirstOrDefault(x => x.Id == Core.Cfg.ShareHost);
+        bool hostHere = hostDef != null && cards.Any(k => k.Def == hostDef && Installed(k.Def) && UserData.IsPortable(k.Def));
+        if (hostDef != null && installed && !portable) c.Data.Text = "Not sharing: it keeps its saves outside its folder.";
+        else if (hostDef != null && portable)
+        {
+            bool all = UserData.HostItems.All(i => UserData.StateOf(d, i) == UserData.State.On);
+            if (hostDef == d) c.Data.Text = "Your other emulators use this data.";
+            else if (all) c.Data.Text = "Uses " + hostDef.Name + "'s data.";
+            else
+            {   // not joined yet: say what it waits for
+                string why; joinWhy.TryGetValue(d.Id, out why);
+                List<string> open = cards.Where(k => Installed(k.Def) && Core.Running(k.Def).Count > 0 &&
+                                                     (k == c || UserData.HostItems.Any(i => UserData.StateOf(k.Def, i) != UserData.State.Off))).Select(k => k.Def.Name).ToList();
+                c.Data.Text = UserData.HostItems.Any(i => UserData.LinkedElsewhere(d, i)) ? "Not sharing: it uses a folder you linked yourself."
+                            : open.Count > 0 ? "Not sharing yet: close " + string.Join(" and ", open) + " first."
+                            : why != null ? "Not sharing yet: " + why + "."
+                            : "Not sharing yet.";
+            }
+        }
+        else c.Data.Text = shared.Count > 0 ? "Shared with your other emulators: " + string.Join(", ", shared.Select(i => i.Label.ToLower())) : "";
+        c.Share.Checked = hostDef == d;
+        c.Share.Enabled = !c.Busy && !IsBusy && (hostDef == null || hostDef == d || !hostHere);   // one at a time: the others are greyed out
         c.NextKind = !installed || c.Busy ? null : !portable ? "portable" : NoReminder(d) ? null : !HasKeys(d) ? "keys" : !HasFirmware(d) ? "firmware" : null;
         c.Next.Text = c.NextKind == "portable" ? "Keep its saves in its own folder" : c.NextKind == "keys" ? "Next: add your keys" : c.NextKind == "firmware" ? "Next: add firmware" : "";
 
@@ -997,9 +1045,69 @@ class EmuForm : Form
     }
 
     // ---- actions (one at a time, on a worker thread)
+    // Is a newer manager on GitHub? Shows "Update the manager to X" under the header buttons.
+    void CheckManager(bool fresh)
+    {
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            Release r = null; Version v = null; string err = null;
+            try { r = Core.ManagerUpdate(fresh, out v); } catch (Exception ex) { err = ex.Message; }
+            UI(delegate
+            {
+                if (err != null) { FileLog("Manager update check failed: " + err); return; }
+                mgrRel = r; mgrVer = v;
+                mgrLink.Text = r != null ? "Update the manager to " + v : "";
+                mgrLink.Visible = r != null && !anyBusy;
+                if (r != null) Log("A newer manager is out: " + v + " (this one is " + Core.AppVersion + ").");
+                DoLayout();
+            });
+        });
+    }
+
+    // Downloads the newer manager, then opens its Setup on this install and closes, so Setup can replace it.
+    void UpdateManager()
+    {
+        if (IsBusy) { PleaseWait(); return; }
+        Release r = mgrRel; Version v = mgrVer;
+        if (r == null) return;
+        if (Ask("Update the manager", "Download version " + v + " of the manager and open its setup? The manager closes so it can be updated. Your emulators and saves are kept.", "Update", "Cancel") != 0) return;
+        anyBusy = true; mgrLink.Visible = false; RefreshAll();
+        SetFooter("Downloading the manager update...", Theme.Info);
+        Log("Updating the manager to " + v + ".");
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            string setup = null, err = null;
+            try
+            {
+                setup = Core.DownloadManagerUpdate(r, s => UI(delegate { Log(s); }),
+                    (got, total) => UI(delegate { if (total > 0) SetFooter("Downloading the manager update... " + (got * 100 / total) + "%", Theme.Info); }));
+            }
+            catch (Exception ex) { err = ex.Message; }
+            UI(delegate
+            {
+                anyBusy = false; RefreshAll();
+                if (err != null)
+                {
+                    Log("Manager update failed: " + err);
+                    SetFooter(err.StartsWith("The download server isn't responding") ? "The download server isn't responding. Try again later." : "The manager update didn't download. Try again later.", Theme.Danger);
+                    mgrLink.Visible = true;
+                    return;
+                }
+                if (Core.Cfg.Sandbox) { SetFooter("Test copy: the update was downloaded, Setup was not started.", Theme.Muted); Explore(Path.GetDirectoryName(setup)); return; }
+                try
+                {
+                    Process.Start(new ProcessStartInfo(setup, "--update \"" + Core.Home.TrimEnd('\\') + "\"") { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(setup) });
+                    Log("Started the manager's setup; closing so it can update.");
+                    Close();
+                }
+                catch (Exception ex) { Log("Could not start the setup: " + ex.Message); SetFooter("The setup didn't start. Try again.", Theme.Danger); }
+            });
+        });
+    }
     // fresh: ask the hosts now (the user clicked Check for updates); otherwise lists from the last 10 minutes are used
     void CheckAll(bool fresh = false)
     {
+        CheckManager(fresh);
         if (cards.Count == 0) { SetFooter("", Theme.Muted); return; }
         SetFooter("Checking for updates...", Theme.Muted);
         foreach (EmuCard c in cards) { c.CheckErr = null; c.Rel = null; Refresh(c); }
@@ -1106,13 +1214,12 @@ class EmuForm : Form
             Explore(kd);
             return;
         }
-        // share what this one is missing; everything already shared stays shared (other items are asked about as usual)
-        List<string> want = UserData.Items.Where(i => cards.Any(k => Installed(k.Def) && UserData.StateOf(k.Def, i) == UserData.State.On)).Select(i => i.Key).ToList();
-        List<string> fill = new List<string>();
-        if (!keys) fill.Add("keys");
-        if (!fw) fill.Add("firmware");
-        foreach (string kk in fill) if (!want.Contains(kk)) want.Add(kk);
-        ApplyShared(want, donor, fill);
+        // copy what this one is missing from the other emulator (only into this one; nothing else changes)
+        if (Core.Running(d).Count > 0) { Fail(c, "Close " + d.Name + ", then try again."); return; }
+        List<UserData.Item> fill = UserData.Items.Where(i => (i.Key == "keys" && !keys) || (i.Key == "firmware" && !fw)).ToList();
+        EmuDef from = donor.Def;
+        Work(c, "Copying keys and firmware", (log, prog) => { foreach (UserData.Item it in fill) UserData.CopyMissing(from, d, it, log); },
+             delegate { RefreshAll(); if ((!keys && !HasKeys(d)) || (!fw && !HasFirmware(d))) Fail(c, "Nothing could be copied. Add them by hand."); });
     }
 
     void MakePortable(EmuCard c)
@@ -1130,20 +1237,114 @@ class EmuForm : Form
         Work(c, "Copying saves and settings", (log, prog) => { log(UserData.MakePortable(d, from, log)); }, delegate { JoinSharing(c); });
     }
 
-    // An emulator that now keeps its own data joins what the others share (the user is asked when data differs).
+    // While sharing is on, an emulator that isn't linked yet (just added, or now keeping its own data) joins it without
+    // questions: it uses the shared data, and its own goes to the backup folder (Shared data\Set aside).
     // c == null: check every emulator. If something is running, it waits and runs when the work is done.
     bool joinPending;
+    readonly Dictionary<string, string> joinWhy = new Dictionary<string, string>();   // id -> why it didn't join (plain words); retried on Activated
     void JoinSharing(EmuCard c)
     {
-        if (Core.Cfg.ShareNew == null || Core.Cfg.ShareNew.Count == 0) return;
-        List<UserData.Item> want = UserData.Items.Where(i => Core.Cfg.ShareNew.Contains(i.Key)).ToList();
-        bool needed = cards.Where(k => c == null || k == c).Any(k => Installed(k.Def) && UserData.IsPortable(k.Def) && want.Any(i => UserData.StateOf(k.Def, i) == UserData.State.Off));
-        if (!needed) return;
+        if (Core.Cfg.ShareHost == null) return;
+        List<EmuCard> need = cards.Where(k => (c == null || k == c) && Installed(k.Def) && UserData.IsPortable(k.Def) && !joinWhy.ContainsKey(k.Def.Id) &&
+                                              UserData.HostItems.Any(i => UserData.StateOf(k.Def, i) != UserData.State.On)).ToList();
+        if (need.Count == 0) return;
         if (IsBusy || installQueue.Count > 0 || addingFound > 0) { joinPending = true; return; }
         BeginInvoke((MethodInvoker)delegate
         {
             if (IsBusy || installQueue.Count > 0 || addingFound > 0) { joinPending = true; return; }
-            ApplyShared(Core.Cfg.ShareNew.ToList(), null, null);
+            // any open emulator that uses the shared data, or that would join, blocks it: try again later (Activated)
+            if (cards.Any(k => Installed(k.Def) && Core.Running(k.Def).Count > 0 && (need.Contains(k) || UserData.HostItems.Any(i => UserData.StateOf(k.Def, i) != UserData.State.Off))))
+            { joinPending = true; Log("Joining shared data waits until the emulators are closed."); RefreshAll(); return; }
+            List<EmuCard> todo = new List<EmuCard>();
+            foreach (EmuCard k in need)
+            {   // a lasting problem (linked by hand, a drive that can't share...) is shown on the card, not retried in a loop
+                string why = UserData.SharingProblem(k.Def);
+                if (why == null) todo.Add(k); else if (!why.StartsWith("close")) joinWhy[k.Def.Id] = why;
+            }
+            if (todo.Count == 0) { RefreshAll(); return; }
+            Dictionary<string, string> failed = new Dictionary<string, string>();
+            Work(todo[0], "Sharing data", (log, prog) =>
+            {
+                foreach (EmuCard k in todo)
+                    try { UserData.JoinOne(k.Def, log); }
+                    catch (Exception ex) { failed[k.Def.Id] = UserData.PlainReason(ex); log(k.Def.Name + " didn't join the shared data yet: " + ex.Message); }
+            }, delegate { foreach (var f in failed) joinWhy[f.Key] = f.Value; RefreshAll(); });
+        });
+    }
+
+    // Settings from before the share tick: sharing that is fully on (keys, firmware and saves linked) gets a ticked card;
+    // partial sharing from the old Shared data window stays as it is (nothing joins it automatically any more).
+    void SharingFromOlderVersions()
+    {
+        try
+        {
+            bool changed = false;
+            if (Core.Cfg.ShareHost != null && !Core.Cfg.Emulators.Any(x => x.Id == Core.Cfg.ShareHost)) { Core.Cfg.ShareHost = null; changed = true; }
+            if (Core.Cfg.ShareHost == null)
+            {
+                EmuCard full = cards.FirstOrDefault(k => Installed(k.Def) && UserData.IsPortable(k.Def) && UserData.HostItems.All(i => UserData.StateOf(k.Def, i) == UserData.State.On));
+                if (full != null) { Core.Cfg.ShareHost = full.Def.Id; Core.Cfg.ShareNew = UserData.HostItems.Select(i => i.Key).ToList(); changed = true; Log("Sharing was on: " + full.Def.Name + " is ticked."); }
+                else if (Core.Cfg.ShareNew != null) { Core.Cfg.ShareNew = null; changed = true; }
+            }
+            if (changed) Core.SaveConfig();
+        }
+        catch (Exception ex) { Log("Could not read the sharing setup: " + ex.Message); }
+    }
+
+    // The card's "Share this emulator's data" tick.
+    //  - Nothing shared yet: this emulator's keys, firmware and saves become the ones all of them use. Each other
+    //    emulator's own data goes to the backup folder first. (An item this one doesn't have comes from the emulator that
+    //    changed it last.)
+    //  - Another one is ticked: this one is ticked instead; everyone keeps playing from the same, latest data.
+    //  - Unticking: sharing stops; every emulator keeps its own copy of the latest data.
+    void ToggleShare(EmuCard c)
+    {
+        if (IsBusy) { PleaseWait(); return; }
+        EmuDef d = c.Def;
+        List<EmuCard> inst = cards.Where(k => Installed(k.Def) && UserData.IsPortable(k.Def)).ToList();
+        EmuDef host = Core.Cfg.ShareHost == null ? null : Core.Cfg.Emulators.FirstOrDefault(x => x.Id == Core.Cfg.ShareHost);
+        List<string> open = inst.Where(k => Core.Running(k.Def).Count > 0).Select(k => k.Def.Name).ToList();
+        if (host == d)
+        {
+            if (Ask("Stop sharing", "Stop sharing data? Each emulator keeps its own copy of the current keys, firmware and saves.", "Stop sharing", "Cancel") != 0) return;
+            if (open.Count > 0) { Tell("Stop sharing", "Close " + string.Join(" and ", open) + " first."); return; }
+            List<EmuDef> defs = inst.Select(k => k.Def).ToList();
+            Work(c, "Stopping sharing", (log, prog) => UserData.StopSharing(defs, log), delegate
+            {
+                Core.Cfg.ShareHost = null; Core.Cfg.ShareNew = null;
+                try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save: " + ex.Message); }
+                Log("Sharing stopped; every emulator has its own copy.");
+                RefreshAll();
+            });
+            return;
+        }
+        if (host != null && cards.Any(k => k.Def == host))
+        {   // switching which one is ticked: the data everyone uses stays the same (the latest progress)
+            Core.Cfg.ShareHost = d.Id;
+            try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save: " + ex.Message); }
+            Log(d.Name + " is now the one that shares (was " + host.Name + "); everyone keeps the same data.");
+            RefreshAll();
+            JoinSharing(null);
+            return;
+        }
+        if (open.Count > 0) { Tell("Share data", "Close " + string.Join(" and ", open) + " first."); return; }
+        if (UserData.HostItems.Any(i => UserData.LinkedElsewhere(d, i))) { Tell("Share data", d.Name + "'s data is in a folder you linked yourself, so it can't be shared."); return; }
+        if (Ask("Share " + d.Name + "'s data", "All your emulators will use " + d.Name + "'s keys, firmware and saves, so progress shows up in all of them. Saves for other games are kept.\r\n\r\nIf two emulators have a save for the same game, " + d.Name + "'s is used and the other is kept as a backup.", "Share", "Cancel") != 0) return;
+        List<EmuDef> all = cards.Where(k => Installed(k.Def)).Select(k => k.Def).ToList();   // not-portable ones are named as left out
+        if (!all.Contains(d)) all.Insert(0, d);
+        List<string> left = new List<string>();
+        Work(c, "Sharing data", (log, prog) => { left = UserData.StartSharing(d, all, log); }, delegate
+        {
+            Core.Cfg.ShareHost = d.Id; Core.Cfg.ShareNew = UserData.HostItems.Select(i => i.Key).ToList();
+            try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save: " + ex.Message); }
+            Log("Sharing " + d.Name + "'s keys, firmware and saves with every emulator" + (left.Count > 0 ? ", except " + string.Join("; ", left) : "") + ".");
+            RefreshAll();
+            if (left.Count > 0)
+            {
+                joinPending = true;
+                bool selfFix = left.All(x => x.Contains(": close ") || x.Contains("in use"));
+                Tell("Share data", "Shared. These aren't sharing yet:\r\n" + string.Join("\r\n", left.Select(x => "- " + x)) + (selfFix ? "\r\n\r\nThey join by themselves when they can." : ""));
+            }
         });
     }
 
@@ -1261,6 +1462,7 @@ class EmuForm : Form
         Core.Cfg.Emulators.Remove(c.Def);
         try { Core.SaveConfig(); } catch { }
         cards.Remove(c); cardsHost.Controls.Remove(c.Box); c.Box.Dispose();
+        if (Core.Cfg.ShareHost == c.Def.Id) { SharingFromOlderVersions(); RefreshAll(); }   // another linked one is ticked, or none
         DoLayout();
     }
 
@@ -1632,20 +1834,7 @@ class EmuForm : Form
             gb.Click += delegate { PickGames(); showG(); };
             foreach (Control k in gr.Controls) { k.BackColor = Theme.Card; k.ForeColor = Theme.Text; }
             y += D(58);
-            // first start: one tick for sharing keys, firmware and saves between the emulators it installs
-            CheckBox share = new CheckBox(); share.Text = "Use the same keys, firmware and saves in all of them"; share.SetBounds(D(20), y, W - D(40), D(28));
-            share.ForeColor = Theme.Text; share.BackColor = Theme.Window; share.Checked = true; share.Visible = first;
-            f.Controls.Add(share); StyleCheck(share);
-            Action setShare = () =>
-            {
-                if (!first) return;
-                Core.Cfg.ShareNew = share.Checked ? UserData.Items.Where(i => i.Default).Select(i => i.Key).ToList() : null;
-                try { Core.SaveConfig(); } catch { }
-            };
-            share.CheckedChanged += delegate { setShare(); };
-            setShare();
-            if (first) y += D(36);
-            y += D(6);
+            y += D(6);   // sharing is a tick on each emulator's card
             LinkLabel link = new LinkLabel(); link.Text = "Add from link..."; link.SetBounds(D(16), y + D(8), D(160), D(22));
             link.LinkColor = link.ActiveLinkColor = link.VisitedLinkColor = Theme.Accent; link.LinkBehavior = LinkBehavior.HoverUnderline; f.Controls.Add(link);
             link.LinkClicked += delegate { fromLink = true; f.DialogResult = DialogResult.Cancel; f.Close(); };
@@ -1658,12 +1847,7 @@ class EmuForm : Form
             f.ClientSize = new Size(W, y + D(52));
             f.HandleCreated += delegate { Native.Apply(f.Handle, Theme.Dark, 0); };
             DialogResult dr = f.ShowDialog(this);
-            if (first)
-            {   // what new emulators share from the start (Shared data in the menu changes it later)
-                setShare();
-                Log("New emulators share: " + (share.Checked ? string.Join(", ", Core.Cfg.ShareNew) : "nothing"));
-                JoinSharing(null);   // emulators added with "I already have it" in this window
-            }
+            if (first) JoinSharing(null);   // emulators added with "I already have it" join sharing, if it's on
             if (fromLink) { BeginInvoke((MethodInvoker)AddFork); return; }
             if (dr != DialogResult.OK) { if (first) Log("Welcome: nothing installed for now."); return; }
             List<EmuDef> keep = picks.Where(p => p.Value.Checked && p.Value.Enabled && found.Contains(p.Key)).Select(p => p.Key).ToList();
@@ -2185,6 +2369,37 @@ class EmuForm : Form
         {
             try
             {
+                if (a[i] == "manager-check" || a[i] == "manager-download")   // tests: newest manager on GitHub; download + unpack it (any version)
+                {
+                    Version nv; Release mr = Core.ManagerUpdate(true, out nv);
+                    log("this manager " + Core.AppVersion + ", newest on GitHub " + (nv != null ? nv.ToString() : "none") + ", update offered: " + (mr != null));
+                    if (a[i] == "manager-download")
+                    {
+                        if (mr == null)
+                        {   // test: take the newest release even if it isn't newer
+                            log("(no newer release; downloading v" + nv + " for the test)");
+                            mr = Core.ManagerRelease(nv);
+                        }
+                        log("setup: " + Core.DownloadManagerUpdate(mr, log, (g, t) => { }));
+                    }
+                    continue;
+                }
+                if (a[i] == "host" && i + 1 < a.Count)   // test: tick "Share this emulator's data" on ID
+                {
+                    string hid = a[++i]; EmuDef h = Core.Cfg.Emulators.First(x => x.Id == hid);
+                    List<EmuDef> all = Core.Cfg.Emulators.Where(x => !string.IsNullOrEmpty(x.Exe) && File.Exists(Path.Combine(x.Dir, x.Exe)) && UserData.IsPortable(x)).ToList();
+                    if (Core.Cfg.ShareHost == null) UserData.StartSharing(h, all, log);
+                    Core.Cfg.ShareHost = h.Id; Core.Cfg.ShareNew = UserData.HostItems.Select(it => it.Key).ToList(); Core.SaveConfig();
+                    log("host -> " + h.Id);
+                    continue;
+                }
+                if (a[i] == "host-stop")
+                {
+                    UserData.StopSharing(Core.Cfg.Emulators.Where(x => UserData.IsPortable(x)).ToList(), log);
+                    Core.Cfg.ShareHost = null; Core.Cfg.ShareNew = null; Core.SaveConfig();
+                    log("sharing stopped");
+                    continue;
+                }
                 if (a[i] == "check" || a[i] == "check-fresh")   // check-fresh: ask the hosts now, like the Check for updates link
                     foreach (EmuDef d in Core.Cfg.Emulators)
                     {
@@ -2299,7 +2514,7 @@ class EmuForm : Form
                 }
                 else { log("unknown command " + a[i]); rc = 1; }
             }
-            catch (Exception ex) { log("ERROR: " + ex.Message); rc = 1; }
+            catch (Exception ex) { log("ERROR: " + ex.Message); FileLog(ex.ToString()); rc = 1; }
         }
         return rc;
     }

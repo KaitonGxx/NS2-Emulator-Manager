@@ -37,6 +37,7 @@ public class Config
     public List<string> NoInstallPrompt { get; set; }   // ids the user told "don't ask again" about installing
     public bool Sandbox { get; set; }           // test environment (--sandbox DIR): shown in the title, can be reset
     public List<string> ShareNew { get; set; }  // UserData item keys new builds share from the start (null = none)
+    public string ShareHost { get; set; }       // id of the emulator whose data all of them use (its card is ticked); null = no sharing
     public List<string> NoSetupReminder { get; set; }   // emulator ids whose card doesn't say "Next: add your keys / firmware"
     public string Window { get; set; }          // main window as the user left it: "x,y,width,height,maximized" (screen pixels)
 }
@@ -72,6 +73,56 @@ public static class Core
     public static Config Cfg;
     public static bool FirstRun;
     public const string MAIN_REPO = "Djihads80/Eglantine";   // Eglantine main: always listed first
+    public const string MANAGER_REPO = "KaitonGxx/NS2-Emulator-Manager";   // where the manager itself is released
+    public const string MANAGER_ZIP = "NS2EmulatorManager.zip";
+
+    // This manager's version (1.2.13).
+    public static Version AppVersion { get { Version v = typeof(Core).Assembly.GetName().Version; return new Version(v.Major, v.Minor, Math.Max(0, v.Build)); } }
+
+    // The newest release of the manager on GitHub (tag v1.2.14 with NS2EmulatorManager.zip), or null when there's none
+    // newer than this one. fresh: ask GitHub now instead of a list from the last 10 minutes.
+    public static Release ManagerUpdate(bool fresh, out Version newest)
+    {
+        Release best = ManagerRelease(null, fresh, out newest);
+        return best != null && newest > AppVersion ? best : null;
+    }
+
+    // The newest manager release (want == null) or the one with version want.
+    public static Release ManagerRelease(Version want) { Version v; return ManagerRelease(want, false, out v); }
+    static Release ManagerRelease(Version want, bool fresh, out Version newest)
+    {
+        newest = null;
+        Release best = null;
+        foreach (Dictionary<string, object> r in ReleasesJson("github", null, MANAGER_REPO, 1, fresh).OfType<Dictionary<string, object>>())
+        {
+            if (S(r, "draft") == "True" || S(r, "prerelease") == "True") continue;
+            Version v;
+            if (!Version.TryParse((S(r, "tag_name") ?? "").TrimStart('v', 'V'), out v)) continue;
+            v = new Version(v.Major, v.Minor, Math.Max(0, v.Build));
+            object[] assets = r.ContainsKey("assets") ? r["assets"] as object[] : null;
+            Dictionary<string, object> zip = assets == null ? null : assets.OfType<Dictionary<string, object>>().FirstOrDefault(a => string.Equals(S(a, "name"), MANAGER_ZIP, StringComparison.OrdinalIgnoreCase));
+            if (zip == null || (want != null && v != want) || (newest != null && v <= newest)) continue;
+            newest = v; best = MakeRelease(r, zip);
+        }
+        return best;
+    }
+
+    // Downloads the manager release (checked against GitHub's SHA-256), unpacks it and returns its Setup.exe.
+    public static string DownloadManagerUpdate(Release r, Action<string> log, Action<long, long> progress)
+    {
+        EmuDef me = new EmuDef { Id = "manager-update", Name = "NS2 Emulator Manager" };
+        string zip = Download(me, r, log, progress, CancellationToken.None);
+        // a new folder each time: a setup from an earlier try may still be open
+        string root = Path.Combine(DataDir, "manager-update"), dst = Path.Combine(root, Safe(r.Tag) + "-" + DateTime.Now.ToString("yyyyMMddHHmmss"));
+        try { foreach (string old in Directory.GetDirectories(root)) try { Directory.Delete(old, true); } catch { } } catch { }
+        Directory.CreateDirectory(dst);
+        Unzip(zip, dst);
+        string setup = Directory.GetFiles(dst, "Setup.exe", SearchOption.AllDirectories).FirstOrDefault();
+        if (setup == null || !File.Exists(Path.Combine(Path.GetDirectoryName(setup), "EmuManager.exe")))
+            throw new Exception("The manager release has no Setup.exe next to EmuManager.exe.");
+        log("Manager " + r.Tag + " is ready: " + setup);
+        return setup;
+    }
     // Naming rule: the upstream repo is "Eglantine Main"; every other build is "<name> (fork)" (an existing
     // "(... fork)" ending is replaced, so "PokeDinner (Eglantine fork)" -> "PokeDinner (fork)").
     public static string DisplayName(EmuDef e)

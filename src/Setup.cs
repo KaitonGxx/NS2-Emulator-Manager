@@ -21,7 +21,7 @@ using Microsoft.Win32;
 
 static class SetupApp
 {
-    public const string APP = "NS2 Emulator Manager", VERSION = "1.2.13", PUBLISHER = "NS2 Emulator Manager";
+    public const string APP = "NS2 Emulator Manager", VERSION = "1.2.14", PUBLISHER = "NS2 Emulator Manager";
     public const string KEY = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Switch2EmulatorManager";
     public static string DesktopLnk { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "NS2 Emulator Manager.lnk"); } }
     public static string StartLnk { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "NS2 Emulator Manager.lnk"); } }
@@ -68,7 +68,12 @@ static class SetupApp
             string dir = InstalledDir() ?? Path.GetDirectoryName(Application.ExecutablePath);
             Application.Run(new SetupForm(true, dir));
         }
-        else Application.Run(new SetupForm(false, InstalledDir()));
+        else
+        {   // --update DIR: started by the manager in DIR to update itself (its folder, even without an Apps entry)
+            int ui = Array.IndexOf(args, "--update");
+            string pre = ui >= 0 && ui + 1 < args.Length && File.Exists(Path.Combine(args[ui + 1], "EmuManager.exe")) ? Path.GetFullPath(args[ui + 1]).TrimEnd('\\') : null;
+            Application.Run(new SetupForm(false, pre ?? InstalledDir()));
+        }
         return 0;
     }
 
@@ -105,7 +110,7 @@ static class SetupApp
             throw new Exception("EmuManager.exe isn't next to Setup.exe. Extract the whole zip first (right-click it > Extract All), then run Setup.exe from that folder.");
         byte[] payload = File.ReadAllBytes(appFile);
         Directory.CreateDirectory(dir);
-        if (ManagerRunning(dir)) throw new Exception("Close the NS2 Emulator Manager first, then press Install again.");
+        if (ManagerRunning(dir)) throw new Exception("Close the NS2 Emulator Manager first, then try again.");
         string exe = Path.Combine(dir, "EmuManager.exe"), tmp = exe + ".new";
         File.WriteAllBytes(tmp, payload);
         if (File.Exists(exe)) File.Delete(exe);

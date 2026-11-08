@@ -352,10 +352,11 @@ public static class UserData
     public static DateTime LastChanged(Item it, EmuDef e)
     {
         DateTime t = DateTime.MinValue;
-        foreach (string rel in it.Paths)
+        string[] rels = it.Key == "saves" ? new[] { @"nand\user\save", @"nand\system\save" } : it.Paths;   // game saves, not updates/DLC
+        foreach (string rel in rels)
         {
             string d = e == null ? Path.Combine(SharedRoot, rel) : Path.Combine(UserDir(e), rel);
-            if (e != null && JunctionTarget(d) != null) continue;
+            if (e != null && (JunctionTarget(d) != null || JunctionTarget(Path.GetDirectoryName(d)) != null)) continue;
             try { foreach (string f in Files(d).Values) { DateTime w = File.GetLastWriteTimeUtc(f); if (w > t) t = w; } } catch { }
         }
         return t;
@@ -363,6 +364,193 @@ public static class UserData
 
     public static bool SharedHasData(Item it) { return it.Paths.Any(rel => HasFiles(Path.Combine(SharedRoot, rel))); }
 
+    // Why build k can't take part in sharing right now (plain words), or null.
+    public static string SharingProblem(EmuDef k)
+    {
+        if (!IsPortable(k)) return "keeps its saves outside its folder";
+        if (Core.Running(k).Count > 0) return "close it first";
+        if (HostItems.Any(i => LinkedElsewhere(k, i))) return "uses a folder you linked yourself";
+        try { CheckFolders(k); CheckLinks(k); } catch (Exception ex) { return ex.Message; }
+        return null;
+    }
+
+    // A failure while sharing, in plain words for the card / message (details stay in the log).
+    public static string PlainReason(Exception ex)
+    {
+        string m = ex.Message ?? "";
+        if (m.StartsWith("Close ") && m.EndsWith(" first.")) return "close " + m.Substring(6, m.Length - 13) + " first";
+        if (m.StartsWith("Sharing doesn't work") || m.StartsWith("Not enough free space")) return m.TrimEnd('.');
+        if (ex is IOException || ex is UnauthorizedAccessException) return "a file is in use; it tries again later";
+        return "it didn't work (see the log)";
+    }
+
+    // "Share data with other emulators" ticked on host. For keys, firmware and saves, everyone ends up on one shared copy:
+    //  - host's own copy; or, when host already uses the shared folder, the shared copy (the latest progress);
+    //  - when host has neither, the copy changed last (another build's, or what the shared folder holds).
+    // Every other build then joins (JoinOne). Builds that can't join now are left out and listed ("Name: why").
+    // host itself must be able to take part; otherwise nothing changes.
+    public static List<string> StartSharing(EmuDef host, List<EmuDef> all, Action<string> log)
+    {
+        string hp = SharingProblem(host);
+        if (hp != null) throw new Exception(host.Name + ": " + hp + ".");
+        Dictionary<EmuDef, string> skip = new Dictionary<EmuDef, string>();
+        foreach (EmuDef k in all) if (k != host) { string p = SharingProblem(k); if (p != null) skip[k] = p; }
+        foreach (Item it in HostItems)
+        {
+            EmuDef k0 = null;
+            if (OwnData(host, it)) k0 = host;
+            else if (StateOf(host, it) == State.Off)
+            {   // host has none of it: the newest copy among the others and the shared folder
+                DateTime best = SharedHasData(it) ? LastChanged(it, null) : DateTime.MinValue;
+                foreach (EmuDef k in all)
+                    if (k != host && !skip.ContainsKey(k) && OwnData(k, it)) { DateTime t = LastChanged(it, k); if (t > best) { best = t; k0 = k; } }
+            }
+            if (k0 != null && StateOf(k0, it) != State.On) Share(k0, it, "build", log);
+            if (StateOf(host, it) != State.On) JoinItem(host, it, log);
+        }
+        List<string> left = skip.Select(p => p.Key.Name + ": " + p.Value).ToList();
+        foreach (EmuDef k in all)
+        {
+            if (k == host || skip.ContainsKey(k)) continue;
+            try { JoinOne(k, log); }
+            catch (Exception ex) { left.Add(k.Name + ": " + PlainReason(ex)); log(k.Name + " didn't join: " + ex.Message); }
+        }
+        return left;
+    }
+
+    // Links what k doesn't fully share yet to the shared copy. Checked first; nothing changes when k can't take part.
+    public static void JoinOne(EmuDef k, Action<string> log)
+    {
+        string p = SharingProblem(k);
+        if (p != null) throw new Exception(p.StartsWith("close") ? "Close " + k.Name + " first." : p);
+        foreach (Item it in HostItems)
+        {
+            if (StateOf(k, it) == State.On) continue;
+            if (LinkedElsewhere(k, it)) throw new Exception(it.Label + " is in a folder linked by hand");
+            JoinItem(k, it, log);
+        }
+    }
+
+    // One item: for saves, k's saves for games the shared saves don't have (and its installed updates/DLC the shared
+    // folder lacks) are added to them first; then the rest of k's own copy goes to Set aside and k is linked. If the
+    // linking fails, what was added is moved back to k.
+    static void JoinItem(EmuDef k, Item it, Action<string> log)
+    {
+        List<KeyValuePair<string, string>> moved = it.Key == "saves" ? MergeSaves(k, log) : new List<KeyValuePair<string, string>>();
+        try { Share(k, it, "shared", log); }
+        catch
+        {
+            for (int i = moved.Count - 1; i >= 0; i--)
+                try
+                {
+                    string from = moved[i].Key, to = moved[i].Value;
+                    if (Directory.Exists(to)) MoveTree(to, from, log);
+                    else if (File.Exists(to)) { Directory.CreateDirectory(Path.GetDirectoryName(from)); MoveFile(to, from); }
+                }
+                catch (Exception ex2) { log("Could not move back " + moved[i].Value + ": " + ex2.Message); }
+            throw;
+        }
+    }
+
+    const string DEVICE = "00000000000000000000000000000000";   // device saves (not a player profile)
+
+    // Moves k's saves for games the shared saves don't have into them: per profile with the same id; when each side
+    // has one player profile, into the shared one; when the shared saves have none yet, as they are. Device saves only
+    // by name. Saves for a game both have stay with k (they go to Set aside). Installed updates/DLC (nand\user\Contents)
+    // the shared folder lacks are added file by file. Returns what was moved (from, to), to undo it.
+    static List<KeyValuePair<string, string>> MergeSaves(EmuDef k, Action<string> log)
+    {
+        List<KeyValuePair<string, string>> moved = new List<KeyValuePair<string, string>>();
+        Item saves = Find("saves");
+        string bUser = Path.Combine(UserDir(k), @"nand\user"), sUser = Path.Combine(SharedRoot, @"nand\user");
+        if (JunctionTarget(bUser) != null || !HasFiles(bUser) || !SharedHasData(saves)) return moved;   // nothing to add, or nothing shared yet
+        if (FindReparse(bUser) != null || FindReparse(sUser) != null) return moved;
+        BlockIfRunning(k, saves);
+        string b = Path.Combine(bUser, @"save\0000000000000000"), s = Path.Combine(sUser, @"save\0000000000000000");
+        if (Directory.Exists(b))
+        {
+            Directory.CreateDirectory(s);
+            Func<string, List<string>> players = d => Directory.GetDirectories(d).Where(x => !IsReparse(x) && !string.Equals(Path.GetFileName(x), DEVICE, StringComparison.OrdinalIgnoreCase)).ToList();
+            List<string> pb = players(b), ps = players(s);
+            foreach (string p in Directory.GetDirectories(b))
+            {
+                if (IsReparse(p) || !HasFiles(p)) continue;
+                string name = Path.GetFileName(p), target;
+                if (string.Equals(name, DEVICE, StringComparison.OrdinalIgnoreCase)) target = Path.Combine(s, DEVICE);
+                else target = ps.FirstOrDefault(x => string.Equals(Path.GetFileName(x), name, StringComparison.OrdinalIgnoreCase))
+                              ?? (ps.Count == 0 ? Path.Combine(s, name) : pb.Count == 1 && ps.Count == 1 ? ps[0] : null);
+                if (target == null) continue;   // several profiles on both sides: left with k (Set aside)
+                if (!Directory.Exists(target))
+                {
+                    MoveTree(p, target, log); moved.Add(new KeyValuePair<string, string>(p, target));
+                    log(k.Name + ": saves of profile " + name + " added to the shared saves.");
+                    continue;
+                }
+                foreach (string game in Directory.GetDirectories(p))
+                {
+                    if (IsReparse(game) || !HasFiles(game)) continue;
+                    string to = Path.Combine(target, Path.GetFileName(game));
+                    if (Directory.Exists(to) || File.Exists(to)) continue;   // both have this game: the shared one is used
+                    MoveTree(game, to, log); moved.Add(new KeyValuePair<string, string>(game, to));
+                    log(k.Name + ": save " + Path.GetFileName(game) + " added to the shared saves.");
+                }
+            }
+        }
+        string bc = Path.Combine(bUser, "Contents"), sc = Path.Combine(sUser, "Contents");
+        if (HasFiles(bc))
+        {
+            int n = 0;
+            foreach (KeyValuePair<string, string> f in Files(bc))
+            {
+                string to = Path.Combine(sc, f.Key.TrimStart('\\'));
+                if (File.Exists(to) || Directory.Exists(to)) continue;
+                Directory.CreateDirectory(Path.GetDirectoryName(to));
+                MoveFile(f.Value, to); moved.Add(new KeyValuePair<string, string>(f.Value, to)); n++;
+            }
+            if (n > 0) log(k.Name + ": " + n + " installed update/DLC file(s) added to the shared folder.");
+        }
+        return moved;
+    }
+
+    static void MoveFile(string from, string to)
+    {
+        if (string.Equals(Path.GetPathRoot(Full(from)), Path.GetPathRoot(Full(to)), StringComparison.OrdinalIgnoreCase)) File.Move(from, to);
+        else { File.Copy(from, to, false); if (new FileInfo(to).Length != new FileInfo(from).Length) { File.Delete(to); throw new IOException("Copying " + from + " didn't match."); } File.Delete(from); }
+    }
+    // Unticked: sharing stops; every build gets its own copy of the latest shared data.
+    public static void StopSharing(List<EmuDef> all, Action<string> log)
+    {
+        foreach (EmuDef k in all)
+            foreach (Item it in Items)
+                if (StateOf(k, it) != State.Off && !LinkedElsewhere(k, it)) Unshare(k, it, log);
+    }
+
+    // The items the card's share tick shares.
+    public static List<Item> HostItems { get { return Items.Where(i => i.Default).ToList(); } }
+
+    // Copies the files of an item that "to" doesn't have from another build (keys / firmware). Nothing is overwritten;
+    // when "to" uses the shared folder for it, the files go there. Returns the number of files copied.
+    public static long CopyMissing(EmuDef from, EmuDef to, Item it, Action<string> log)
+    {
+        CheckFolders(to);
+        BlockIfRunning(to, it);
+        long files = 0;
+        foreach (string rel in it.Paths)
+        {
+            string src = Path.Combine(UserDir(from), rel), dst = Path.Combine(UserDir(to), rel);
+            if (!HasFiles(src)) continue;
+            foreach (KeyValuePair<string, string> f in Files(src))
+            {
+                string target = Path.Combine(dst, f.Key.TrimStart('\\'));
+                if (File.Exists(target)) continue;
+                Directory.CreateDirectory(Path.GetDirectoryName(target));
+                File.Copy(f.Value, target, false);
+                files++;
+            }
+        }
+        log(to.Name + ": " + files + " " + it.Label.ToLower() + " file(s) copied from " + from.Name + ".");
+        return files;
+    }
     // One build per distinct copy of the item among holders, leaving out copies identical to what the shared folder
     // already has. Used to ask "whose saves should all of them use?" only when the copies really differ.
     public static List<EmuDef> DistinctHolders(Item it, List<EmuDef> holders)
