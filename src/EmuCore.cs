@@ -44,6 +44,7 @@ public class Config
 public class Release
 {
     public string Tag, Name, Body, Url, Published, Asset, AssetUrl, Sha256;   // Sha256 null when the host gives none
+    public string ApiUrl;   // GitHub only: the same file through the API (a second route when the download link fails)
     public long Size;
 }
 
@@ -341,6 +342,7 @@ public static class Core
         rel.Tag = S(r, "tag_name") ?? ""; rel.Name = S(r, "name") ?? rel.Tag; rel.Body = S(r, "body") ?? ""; rel.Url = S(r, "html_url");
         rel.Published = S(r, "published_at") ?? S(r, "created_at") ?? "";
         rel.Asset = S(asset, "name"); rel.AssetUrl = S(asset, "browser_download_url");
+        string au = S(asset, "url"); if (au != null && au.StartsWith("https://api.github.com/", StringComparison.OrdinalIgnoreCase)) rel.ApiUrl = au;
         long sz; long.TryParse(S(asset, "size"), out sz); rel.Size = sz;
         string dg = S(asset, "digest");
         if (dg != null && dg.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase)) rel.Sha256 = dg.Substring(7).ToLowerInvariant();
@@ -809,20 +811,24 @@ public static class Core
         }
         string part = dst + ".part";
         log("Downloading " + r.Asset + " (" + Mb(r.Size) + ") from " + r.AssetUrl);
-        HttpWebRequest q = Req(r.AssetUrl); q.Accept = "application/octet-stream"; q.Timeout = 60000;
-        using (WebResponse w = q.GetResponse())
-        using (Stream s = w.GetResponseStream())
-        using (FileStream f = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20))
+        // GitHub's download link sometimes fails (502/503/504, or the connection drops): try again, then the API route
+        List<string> routes = new List<string> { r.AssetUrl, r.AssetUrl };
+        if (r.ApiUrl != null) { routes.Add(r.ApiUrl); routes.Add(r.ApiUrl); }
+        for (int t = 0; ; t++)
         {
-            byte[] buf = new byte[1 << 18]; long got = 0, total = r.Size > 0 ? r.Size : w.ContentLength; int n;
-            DateTime last = DateTime.MinValue;
-            while ((n = s.Read(buf, 0, buf.Length)) > 0)
+            ct.ThrowIfCancellationRequested();
+            try { Fetch(routes[t], part, r, progress, ct); break; }
+            catch (Exception ex)
             {
-                ct.ThrowIfCancellationRequested();
-                f.Write(buf, 0, n); got += n;
-                if ((DateTime.Now - last).TotalMilliseconds > 150) { progress(got, total); last = DateTime.Now; }
+                if (ex is OperationCanceledException) throw;
+                bool server = Retryable(ex);
+                log("Download " + (t + 1) + " failed: " + ex.Message);
+                try { if (File.Exists(part)) File.Delete(part); } catch { }
+                if (!server || t + 1 >= routes.Count)
+                    throw new Exception(server ? "The download server isn't responding right now (" + ex.Message + ")." : ex.Message);
+                if (routes[t + 1] != routes[t]) log("Trying GitHub's other download route.");
+                Thread.Sleep(2000 * (t + 1));
             }
-            progress(got, total);
         }
         long len = new FileInfo(part).Length;
         if (r.Size > 0 && len != r.Size) { File.Delete(part); throw new Exception("Download size " + len + " does not match the host's " + r.Size + "."); }
@@ -835,6 +841,118 @@ public static class Core
         else log("The host publishes no hash for this file. Size matches (" + len + " bytes); SHA-256 " + sha + ". The zip's own CRCs are checked when it is unpacked.");
         File.Move(part, dst);
         return dst;
+    }
+
+    // A server-side or network failure worth another try (not a 404 or a full disk).
+    static bool Retryable(Exception ex)
+    {
+        WebException we = ex as WebException ?? ex.InnerException as WebException;
+        if (we != null)
+        {
+            HttpWebResponse hr = we.Response as HttpWebResponse;
+            if (hr != null) { int c = (int)hr.StatusCode; return c >= 500 || c == 408 || c == 429; }
+            return true;   // timeout, connection reset, name lookup...
+        }
+        return ex is IOException && !(ex is PathTooLongException) && !ex.Message.Contains("space");
+    }
+
+    // Hosts (GitHub above all) can limit the speed of each connection: big files come in 6 pieces at once when the host
+    // allows pieces (HTTP ranges); otherwise in one piece.
+    const int PIECES = 6;
+    static void Fetch(string url, string part, Release r, Action<long, long> progress, CancellationToken ct)
+    {
+        if (r.Size >= 8L << 20)
+        {
+            string final = null;
+            try
+            {
+                HttpWebRequest p = Req(url); p.Accept = "application/octet-stream"; p.Timeout = 60000; p.AddRange(0L, 0L);
+                using (HttpWebResponse w = (HttpWebResponse)p.GetResponse())
+                    if (w.StatusCode == HttpStatusCode.PartialContent) final = w.ResponseUri.AbsoluteUri;   // after GitHub's redirect
+            }
+            catch (WebException) { throw; }
+            catch { final = null; }
+            if (final != null) { FetchPieces(final, part, r.Size, progress, ct); return; }
+        }
+        FetchWhole(url, part, r, progress, ct);
+    }
+
+    static void FetchPieces(string url, string part, long size, Action<long, long> progress, CancellationToken ct)
+    {
+        using (FileStream f = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) f.SetLength(size);
+        long chunk = (size + PIECES - 1) / PIECES;
+        long[] done = new long[1];
+        Exception[] errs = new Exception[PIECES];
+        List<Thread> ts = new List<Thread>();
+        for (int i = 0; i < PIECES; i++)
+        {
+            int k = i;
+            Thread t = new Thread(delegate ()
+            {
+                long pos = k * chunk, to = Math.Min(size, (k + 1) * chunk) - 1;
+                int tries = 0;
+                while (pos <= to && !ct.IsCancellationRequested)
+                {
+                    try
+                    {
+                        HttpWebRequest q = Req(url); q.Accept = "application/octet-stream"; q.Timeout = 60000; q.AddRange(pos, to);
+                        using (HttpWebResponse w = (HttpWebResponse)q.GetResponse())
+                        {
+                            if (w.StatusCode != HttpStatusCode.PartialContent) throw new IOException("The host sent the whole file instead of a piece.");
+                            using (Stream s = w.GetResponseStream())
+                            using (FileStream f = new FileStream(part, FileMode.Open, FileAccess.Write, FileShare.ReadWrite, 1 << 16))
+                            {
+                                f.Seek(pos, SeekOrigin.Begin);
+                                byte[] buf = new byte[1 << 16]; int n;
+                                while (pos <= to && (n = s.Read(buf, 0, (int)Math.Min(buf.Length, to - pos + 1))) > 0)
+                                {
+                                    if (ct.IsCancellationRequested) return;
+                                    f.Write(buf, 0, n); pos += n; Interlocked.Add(ref done[0], n);
+                                }
+                            }
+                        }
+                        if (pos <= to) throw new IOException("The connection closed early.");
+                    }
+                    catch (Exception ex)
+                    {
+                        if (++tries > 4) { errs[k] = ex; return; }   // the whole download is tried again (fresh link) by Download
+                        Thread.Sleep(1500 * tries);
+                    }
+                }
+            });
+            t.IsBackground = true; ts.Add(t); t.Start();
+        }
+        while (ts.Any(t => t.IsAlive))
+        {
+            Thread.Sleep(200);
+            progress(Interlocked.Read(ref done[0]), size);
+        }
+        ct.ThrowIfCancellationRequested();
+        Exception first = errs.FirstOrDefault(x => x != null);
+        if (first != null) throw first;
+        progress(size, size);
+    }
+
+    static void FetchWhole(string url, string part, Release r, Action<long, long> progress, CancellationToken ct)
+    {
+        HttpWebRequest q = Req(url); q.Accept = "application/octet-stream"; q.Timeout = 60000;
+        long got = 0;
+        using (WebResponse w = q.GetResponse())
+        using (Stream s = w.GetResponseStream())
+        using (FileStream f = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20))
+        {
+            byte[] buf = new byte[1 << 18]; long total = r.Size > 0 ? r.Size : w.ContentLength; int n;
+            DateTime last = DateTime.MinValue;
+            while ((n = s.Read(buf, 0, buf.Length)) > 0)
+            {
+                ct.ThrowIfCancellationRequested();
+                f.Write(buf, 0, n); got += n;
+                if ((DateTime.Now - last).TotalMilliseconds > 150) { progress(got, total); last = DateTime.Now; }
+            }
+            progress(got, total);
+        }
+        // the connection closed before the whole file came: worth another try
+        if (r.Size > 0 && got < r.Size) throw new IOException("The connection closed early (" + got + " of " + r.Size + " bytes).");
     }
 
     // ---- install / update / restore

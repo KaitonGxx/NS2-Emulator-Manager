@@ -1812,6 +1812,7 @@ class EmuForm : Form
                     c.Err = err.StartsWith("Close the emulator first") ? "Close " + c.Def.Name + ", then try again."
                           : err.StartsWith("Close ") && err.EndsWith(" first.") ? err.Substring(0, err.Length - 7) + ", then try again."
                           : err.StartsWith("Not enough free space") || err.StartsWith("Sharing doesn't work") ? err.Split(new[] { " (" }, StringSplitOptions.None)[0]
+                          : err.StartsWith("The download server isn't responding") ? "The download server isn't responding. Try again later."
                           : what == "Installing" ? "Install failed. Try again."
                           : what == "Updating" ? "Update failed. Try again."
                           : "That didn't work. Try again.";
