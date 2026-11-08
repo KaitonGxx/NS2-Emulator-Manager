@@ -671,6 +671,7 @@ class EmuForm : Form
         // first start: the welcome list (nothing is on the list yet); afterwards the usual update check
         Shown += delegate
         {
+            Log("--- NS2 Emulator Manager " + Core.AppVersion + " started (" + Application.ExecutablePath + ")");
             if (Core.Cfg.Sandbox && Demo != null) { BeginInvoke((MethodInvoker)RunDemo); CheckAll(); return; }
             if (Core.FirstRun) { Core.FirstRun = false; ShowRecommended(true); }
             CheckAll();
@@ -1081,7 +1082,11 @@ class EmuForm : Form
             try
             {
                 setup = Core.DownloadManagerUpdate(r, s => UI(delegate { Log(s); }),
-                    (got, total) => UI(delegate { if (total > 0) SetFooter("Downloading the manager update... " + (got * 100 / total) + "%", Theme.Info); }));
+                    (got, total) => UI(delegate
+                    {
+                        if (got == Core.SLOW) SetFooter(total == 1 ? "GitHub is slow, trying again..." : "The download server is slow, trying again...", Theme.Info);
+                        else if (total > 0) SetFooter("Downloading the manager update... " + (got * 100 / total) + "%", Theme.Info);
+                    }));
             }
             catch (Exception ex) { err = ex.Message; }
             UI(delegate
@@ -1989,6 +1994,7 @@ class EmuForm : Form
         Action<string> log = s => UI(delegate { Log(s); });
         Action<long, long> prog = (got, tot) => UI(delegate
         {
+            if (got == Core.SLOW) { c.State.Text = tot == 1 ? "GitHub is slow, trying again..." : "The download server is slow, trying again..."; return; }
             c.Bar.Set(got, tot);
             c.State.Text = got >= tot && tot > 0 ? what + "..." : "Downloading " + (got / 1048576) + " of " + Math.Max(1, tot / 1048576) + " MB";
         });

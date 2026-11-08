@@ -257,7 +257,7 @@ public static class Core
         HttpWebRequest r = (HttpWebRequest)WebRequest.Create(url);
         r.UserAgent = "Switch2-EmulatorManager/1.0";
         r.Accept = "application/json";
-        r.Timeout = 30000; r.ReadWriteTimeout = 60000;
+        r.Timeout = 20000; r.ReadWriteTimeout = 20000;   // a host that hangs is given up on after 20 s (and tried again)
         r.AllowAutoRedirect = true;
         return r;
     }
@@ -284,7 +284,7 @@ public static class Core
                 }
                 catch { }
             if (msg.Contains("rate limit")) msg = "GitHub's hourly limit for anonymous checks (60) is used up; try again later.";
-            throw new Exception(msg.Length > 300 ? msg.Substring(0, 300) : msg);
+            throw new Exception(msg.Length > 300 ? msg.Substring(0, 300) : msg, ex);   // the WebException stays inside (Retryable looks at it)
         }
     }
 
@@ -632,6 +632,8 @@ public static class Core
     // host each time (GitHub allows 60 anonymous requests an hour). fresh: ask the host anyway ("Check for updates").
     // When the host can't be reached, an older remembered list is used rather than failing.
     public static readonly TimeSpan CacheFor = TimeSpan.FromMinutes(10);
+    // progress(SLOW, 1 = GitHub / 0 = another host): a download attempt failed and is being tried again
+    public const long SLOW = -1;
     static object[] ReleasesJson(string host, string apiBase, string repo, int page, bool fresh = false)
     {
         string url = host == "gitea"
@@ -649,7 +651,8 @@ public static class Core
         {
             try
             {
-                text = GetText(url);
+                try { text = GetText(url); }
+                catch (Exception ex1) { if (!Retryable(ex1)) throw; Thread.Sleep(2000); text = GetText(url); }   // GitHub's API fails now and then: once more
                 if (file != null) try { Directory.CreateDirectory(Path.GetDirectoryName(file)); File.WriteAllText(file, text, new UTF8Encoding(false)); } catch { }
             }
             catch
@@ -878,6 +881,7 @@ public static class Core
                 if (!server || t + 1 >= routes.Count)
                     throw new Exception(server ? "The download server isn't responding right now (" + ex.Message + ")." : ex.Message);
                 if (routes[t + 1] != routes[t]) log("Trying GitHub's other download route.");
+                progress(SLOW, routes[t].IndexOf("github", StringComparison.OrdinalIgnoreCase) >= 0 ? 1 : 0);   // the window says "... is slow, trying again"
                 Thread.Sleep(2000 * (t + 1));
             }
         }
@@ -917,7 +921,7 @@ public static class Core
             string final = null;
             try
             {
-                HttpWebRequest p = Req(url); p.Accept = "application/octet-stream"; p.Timeout = 60000; p.AddRange(0L, 0L);
+                HttpWebRequest p = Req(url); p.Accept = "application/octet-stream"; p.AddRange(0L, 0L);
                 using (HttpWebResponse w = (HttpWebResponse)p.GetResponse())
                     if (w.StatusCode == HttpStatusCode.PartialContent) final = w.ResponseUri.AbsoluteUri;   // after GitHub's redirect
             }
@@ -946,7 +950,7 @@ public static class Core
                 {
                     try
                     {
-                        HttpWebRequest q = Req(url); q.Accept = "application/octet-stream"; q.Timeout = 60000; q.AddRange(pos, to);
+                        HttpWebRequest q = Req(url); q.Accept = "application/octet-stream"; q.AddRange(pos, to);
                         using (HttpWebResponse w = (HttpWebResponse)q.GetResponse())
                         {
                             if (w.StatusCode != HttpStatusCode.PartialContent) throw new IOException("The host sent the whole file instead of a piece.");
@@ -986,7 +990,7 @@ public static class Core
 
     static void FetchWhole(string url, string part, Release r, Action<long, long> progress, CancellationToken ct)
     {
-        HttpWebRequest q = Req(url); q.Accept = "application/octet-stream"; q.Timeout = 60000;
+        HttpWebRequest q = Req(url); q.Accept = "application/octet-stream";
         long got = 0;
         using (WebResponse w = q.GetResponse())
         using (Stream s = w.GetResponseStream())
