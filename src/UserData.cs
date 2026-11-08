@@ -736,6 +736,61 @@ public static class UserData
         foreach (string d in Directory.GetDirectories(src)) if (!IsReparse(d)) CopyNew(d, Path.Combine(dst, Path.GetFileName(d)));
     }
 
+    // ---- for the Save Helper: where saves are, in plain terms
+    public enum SaveKind { Own, Shared, OtherFolder, AppData, None }
+
+    // Where e's game saves are now, and what kind of place that is.
+    public static string SavesOf(EmuDef e, out SaveKind kind)
+    {
+        kind = SaveKind.None;
+        if (string.IsNullOrEmpty(e.Dir)) return null;
+        if (!IsPortable(e))
+        {
+            string a = AppDataSource(e);
+            if (a == null) return null;
+            kind = SaveKind.AppData; return Path.Combine(a, @"nand\user\save");
+        }
+        string nu = Path.Combine(UserDir(e), @"nand\user"), t = JunctionTarget(nu);
+        if (t == null) { kind = SaveKind.Own; return Path.Combine(nu, "save"); }
+        if (t != "(another kind of link)" && string.Equals(Full(t), Full(Path.Combine(SharedRoot, @"nand\user")), StringComparison.OrdinalIgnoreCase))
+        { kind = SaveKind.Shared; return Path.Combine(SharedRoot, @"nand\user\save"); }
+        kind = SaveKind.OtherFolder; return t == "(another kind of link)" ? Path.Combine(nu, "save") : Path.Combine(t, "save");
+    }
+
+    // How many games have saves in a "...\nand\user\save" folder (each game counted once, whatever the profile).
+    public static int CountGames(string saveDir)
+    {
+        try
+        {
+            string root = Path.Combine(saveDir ?? "", "0000000000000000");
+            if (!Directory.Exists(root)) return 0;
+            HashSet<string> games = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string p in Directory.GetDirectories(root))
+                foreach (string g in Directory.GetDirectories(p)) if (HasFiles(g)) games.Add(Path.GetFileName(g));
+            return games.Count;
+        }
+        catch { return 0; }
+    }
+
+    // Saves kept in the backup folder (Shared data\Set aside), newest first: (whose, folder, when).
+    public static List<Tuple<string, string, DateTime>> SavedAside()
+    {
+        List<Tuple<string, string, DateTime>> l = new List<Tuple<string, string, DateTime>>();
+        string root = Path.Combine(SharedRoot, SET_ASIDE);
+        if (!Directory.Exists(root)) return l;
+        foreach (string d in Directory.GetDirectories(root))
+        {
+            string saves = Path.Combine(d, @"nand\user\save");
+            if (!HasFiles(saves)) continue;
+            string name = Path.GetFileName(d), who = name;
+            int i = name.IndexOf(" - ", StringComparison.Ordinal);
+            if (i > 0) who = name.Substring(0, i);
+            if (who == "Shared") who = "The shared saves";
+            l.Add(Tuple.Create(who, saves, Directory.GetCreationTime(d)));
+        }
+        return l.OrderByDescending(x => x.Item3).ToList();
+    }
+
     // The items the card's share tick shares.
     public static List<Item> HostItems { get { return Items.Where(i => i.Default).ToList(); } }
 

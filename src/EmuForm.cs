@@ -321,7 +321,7 @@ class EmuForm : Form
     readonly DiscordTag credit = new DiscordTag();   // "made by" on Discord, next to the title
     readonly LinkLabel mgrLink = new LinkLabel();     // "Update the manager to 1.2.14" when GitHub has a newer manager
     Release mgrRel; Version mgrVer;
-    readonly Button addEmu = new Button(), menuBtn = new Button(), logCopy = new Button();
+    readonly Button addEmu = new Button(), menuBtn = new Button(), logCopy = new Button(), saveBtn = new Button();
     readonly LinkLabel checkLink = new LinkLabel(), logLink = new LinkLabel();
     readonly TextBox logBox = new TextBox();
     Form logForm;
@@ -624,8 +624,10 @@ class EmuForm : Form
         addEmu.Text = "Add emulator fork"; addEmu.Click += delegate { ShowRecommended(false); };
         Outline(addEmu, Theme.Accent);
         menuBtn.Text = "..."; menuBtn.Click += delegate { MainMenu().Show(menuBtn, new Point(0, menuBtn.Height)); };
+        saveBtn.Text = "Save Helper"; saveBtn.Click += delegate { SaveHelper(); };
+        tips.SetToolTip(saveBtn, "Where your saves are, and what happens to them");
         tips.SetToolTip(menuBtn, "More");
-        buildsPage.Controls.AddRange(new Control[] { logoBox, head, addEmu, menuBtn, credit });
+        buildsPage.Controls.AddRange(new Control[] { logoBox, head, addEmu, menuBtn, credit, saveBtn });
         tips.SetToolTip(credit, "Made by " + DiscordTag.NAME + " on Discord. Click to copy the name.");
         mgrLink.Visible = false; mgrLink.TextAlign = ContentAlignment.MiddleRight; mgrLink.LinkBehavior = LinkBehavior.HoverUnderline;
         mgrLink.LinkColor = mgrLink.ActiveLinkColor = mgrLink.VisitedLinkColor = Theme.Accent;
@@ -739,6 +741,157 @@ class EmuForm : Form
         else if (n == "main") { }   // just the main window
         else if ((n == "versions" || n == "versionsopen") && c != null) ChooseVersion(c);
         else if (n == "share" && c != null) ToggleShare(c);
+        else if (n == "saves" || n == "savestall") SaveHelper();
+    }
+
+    // ---- Save Helper: where this setup's saves are, in plain words, with a button to open each place
+    Form saveForm;
+    void SaveHelper()
+    {
+        if (saveForm != null && !saveForm.IsDisposed) { saveForm.Activate(); return; }
+        Form f = new Form(); saveForm = f;
+        f.Text = "Save Helper"; f.Font = Font; f.BackColor = Theme.Window; f.ForeColor = Theme.Text; f.Icon = Icon; f.ShowInTaskbar = false;
+        f.StartPosition = FormStartPosition.CenterParent; f.ClientSize = new Size(D(700), D(640)); f.MinimumSize = new Size(D(520), D(360));
+        if (Demo == "savestall") f.ClientSize = new Size(D(700), D(1500));   // test screenshots: everything at once
+        Panel host = new Panel(); host.AutoScroll = true; host.Dock = DockStyle.Fill; host.BackColor = Theme.Window; f.Controls.Add(host);
+        Action fill = null;
+        fill = () =>
+        {
+            int keep = host.VerticalScroll.Value;
+            host.SuspendLayout();
+            foreach (Control old in host.Controls.Cast<Control>().ToList()) old.Dispose();
+            host.Controls.Clear();
+            try { BuildSaveHelper(host, Math.Max(D(400), host.ClientSize.Width - D(8)), fill); }
+            catch (Exception ex) { Log("Save Helper: " + ex.Message); }
+            host.ResumeLayout();
+            try { host.AutoScrollPosition = new Point(0, keep); } catch { }
+        };
+        f.HandleCreated += delegate { Native.Apply(f.Handle, Theme.Dark, 0); };
+        f.Shown += delegate { fill(); };
+        f.ResizeEnd += delegate { fill(); };
+        f.Show(this);
+    }
+
+    // A folder path that fits: the start and the end stay, the middle becomes "...".
+    static string ShortPath(string p, Font font, int width)
+    {
+        if (TextRenderer.MeasureText(p, font).Width <= width) return p;
+        string[] parts = p.Split('\\');
+        if (parts.Length < 4) return p;
+        string head = parts[0] + "\\" + parts[1];
+        for (int keep = parts.Length - 2; keep >= 1; keep--)
+        {
+            string t = head + "\\...\\" + string.Join("\\", parts.Skip(parts.Length - keep));
+            if (TextRenderer.MeasureText(t, font).Width <= width) return t;
+        }
+        return "...\\" + parts[parts.Length - 1];
+    }
+
+    void BuildSaveHelper(Panel host, int W, Action refill)
+    {
+        int y = D(16), x = D(20), w = W - D(40);
+        Func<string, Font, Color, Label> text = (t, font, color) =>
+        {
+            Label l = new Label(); l.Text = t; l.Font = font ?? Font; l.ForeColor = color; l.BackColor = Theme.Window;
+            l.MaximumSize = new Size(w, 0); l.AutoSize = true; l.Location = new Point(x, y);
+            host.Controls.Add(l); y += l.PreferredHeight + D(6); return l;
+        };
+        Action<string> heading = t => { y += D(10); text(t, Theme.Title, Theme.Text); y += D(2); };
+        // one place: a card with what it is, the folder, and Open
+        Action<string, string, string> place = (title, note, path) =>
+        {
+            Card box = new Card(); box.Text = ""; box.Shift = 0; box.SetBounds(x, y, w, D(70)); host.Controls.Add(box);
+            Label t = new Label(); t.Text = title; t.Font = Theme.CardTitle; t.AutoEllipsis = true; t.SetBounds(D(14), D(8), w - D(130), D(22)); t.BackColor = Theme.Card; t.ForeColor = Theme.Text;
+            Label n = new Label(); n.Text = note; n.AutoEllipsis = true; n.SetBounds(D(14), D(30), w - D(130), D(18)); n.BackColor = Theme.Card; n.ForeColor = Theme.Muted;
+            Label pth = new Label(); pth.Text = ShortPath(path ?? "", Font, w - D(134)); pth.SetBounds(D(14), D(48), w - D(130), D(18)); pth.BackColor = Theme.Card; pth.ForeColor = Theme.Muted;
+            tips.SetToolTip(pth, path);
+            Button open = new Button(); open.Text = "Open"; open.SetBounds(w - D(104), D(18), D(90), D(34)); open.Enabled = path != null && Directory.Exists(path);
+            string target = path;
+            open.Click += delegate { Explore(target); };
+            box.Controls.AddRange(new Control[] { t, n, pth, open });
+            StyleButton(open); open.BackColor = Theme.Card;
+            y += D(78);
+        };
+        Func<int, string> games = n => n == 0 ? "no game saves yet" : n == 1 ? "saves for 1 game" : "saves for " + n + " games";
+
+        text("Save Helper", Theme.Header ?? Theme.Title, Theme.Text);
+        text("Where your saves are, and what happens to them. Nothing here changes anything; Open only shows the folder.", null, Theme.Muted);
+
+        // what each emulator uses now
+        heading("Your saves right now");
+        List<EmuCard> inst = cards.Where(k => Installed(k.Def)).ToList();
+        if (inst.Count == 0) text("No emulators yet.", null, Theme.Muted);
+        EmuDef hostDef = Core.Cfg.ShareHost == null ? null : Core.Cfg.Emulators.FirstOrDefault(e => e.Id == Core.Cfg.ShareHost);
+        bool anyShared = false;
+        foreach (EmuCard k in inst)
+        {
+            UserData.SaveKind kind; string where = UserData.SavesOf(k.Def, out kind);
+            int n = UserData.CountGames(where);
+            string note;
+            if (kind == UserData.SaveKind.Shared) { anyShared = true; note = (hostDef == k.Def ? "Shares its saves with your other emulators" : "Uses the shared saves") + " (" + games(n) + ")."; }
+            else if (kind == UserData.SaveKind.Own) note = "Keeps its own saves (" + games(n) + ").";
+            else if (kind == UserData.SaveKind.OtherFolder) note = "Uses saves in another folder, probably from an earlier install (" + games(n) + ").";
+            else if (kind == UserData.SaveKind.AppData) note = "Keeps its saves outside its folder (" + games(n) + "). \"Keep its saves in its own folder\" in its ... menu moves a copy in.";
+            else note = "No saves yet.";
+            place(k.Def.Name, note, where);
+        }
+        if (anyShared)
+            text("Emulators that share all use the same saves: progress in one shows up in all of them.", null, Theme.Muted);
+
+        // saves that were put aside
+        List<Tuple<string, string, DateTime>> aside = UserData.SavedAside();
+        heading("Backups");
+        if (aside.Count == 0) text("No saves have been put aside.", null, Theme.Muted);
+        else
+        {
+            text("When sharing starts, saves that aren't used are kept here instead of being deleted. Restore (when you stop sharing) uses them too.", null, Theme.Muted);
+            foreach (var a in aside.Take(20))
+                place(a.Item1 + "'s saves", "Put aside on " + a.Item3.ToString("d MMM yyyy, HH:mm") + " (" + games(UserData.CountGames(a.Item2)) + ").", a.Item2);
+            if (aside.Count > 20) text("And " + (aside.Count - 20) + " older ones in the same folder.", null, Theme.Muted);
+        }
+
+        // other places worth knowing
+        List<KeyValuePair<string, string>> other = new List<KeyValuePair<string, string>>();
+        foreach (EmuCard k in inst)
+        {
+            if (!UserData.IsPortable(k.Def)) continue;
+            string a = UserData.AppDataSource(k.Def);   // its saves from before it kept its own (copied in; the originals stay)
+            if (a != null && UserData.CountGames(Path.Combine(a, @"nand\user\save")) > 0)
+                other.Add(new KeyValuePair<string, string>("Saves in the Windows app data folder (" + Path.GetFileName(a.TrimEnd('\\')) + ")", Path.Combine(a, @"nand\user\save")));
+        }
+        if (other.Count > 0)
+        {
+            heading("Other places");
+            foreach (var o in other.GroupBy(o => o.Value, StringComparer.OrdinalIgnoreCase).Select(g => g.First()))
+                place(o.Key, "Where emulators keep saves when they don't have their own folder. The manager never changes it (" + games(UserData.CountGames(o.Value)) + ").", o.Value);
+        }
+
+        // the situations, plainly
+        heading("How saves work");
+        foreach (string line in new[]
+        {
+            "Not sharing: each emulator keeps its own saves in its own folder.",
+            "Sharing (\"Share data with other emulators\" on a card): all your emulators use one set of saves, so progress in one shows up in all of them.",
+            "When sharing starts: saves for games the shared saves don't have are added to them. If two emulators have a save for the same game, the ticked one's is used and the other goes to Backups.",
+            "When sharing stops: \"Keep latest\" gives every emulator a copy of the latest saves. \"Restore\" gives the others back the saves they had before. The ticked one always keeps the latest.",
+            "Updating an emulator never touches its saves. Older versions (in Older builds) don't contain saves.",
+            "Uninstalling the manager keeps your emulators and saves. Anything the manager removes goes to the Recycle Bin.",
+        })
+            text("- " + line, null, Theme.Text);
+
+        heading("Back up your saves");
+        text("Close your emulators, then copy the folders under \"Your saves right now\" (the shared one is enough when you share) to a USB stick or a cloud folder. To bring them back, copy them back the same way.", null, Theme.Text);
+
+        y += D(6);
+        Button again = new Button(); again.Text = "Check again"; again.SetBounds(x, y, D(130), D(34)); host.Controls.Add(again);
+        StyleButton(again); again.BackColor = Theme.Window;
+        again.Click += delegate { refill(); };
+        LinkLabel bin = new LinkLabel(); bin.Text = "Open the Recycle Bin"; bin.SetBounds(x + D(146), y + D(8), D(220), D(22)); bin.BackColor = Theme.Window;
+        bin.LinkColor = bin.ActiveLinkColor = bin.VisitedLinkColor = Theme.Accent; bin.LinkBehavior = LinkBehavior.HoverUnderline;
+        bin.LinkClicked += delegate { try { Process.Start("explorer.exe", "shell:RecycleBinFolder"); } catch { } };
+        host.Controls.Add(bin);
+        y += D(50);
+        Label pad = new Label(); pad.SetBounds(x, y, 1, 1); host.Controls.Add(pad);   // room at the bottom when scrolling
     }
 
     void ShowLog()
@@ -780,7 +933,7 @@ class EmuForm : Form
 
     ContextMenuStrip MainMenu()
     {
-        List<object> items = IsBusy ? new List<object>() : new List<object> { "Add from link...", (Action)AddFork, null };
+        List<object> items = IsBusy ? new List<object>() : new List<object> { "Add from link...", (Action)AddFork, "Save Helper", (Action)SaveHelper, null };
         items.AddRange(new object[] {
             "Check for updates", (Action)delegate { CheckAll(true); }, "Show log", (Action)ShowLog, "Open install folder", (Action)delegate { Explore(Core.Home); } });
         if (mgrRel != null && !IsBusy) { items.Insert(0, (Action)UpdateManager); items.Insert(0, "Update the manager to " + mgrVer); }
@@ -844,8 +997,10 @@ class EmuForm : Form
         // header: logo + title left, Add emulator and "..." right
         logoBox.SetBounds(0, D(16), D(36), D(36));
         addEmu.SetBounds(pw - D(226), D(18), D(170), D(34));
+        saveBtn.Visible = pw >= D(600);   // narrow window: it's still in the "..." menu
+        saveBtn.SetBounds(addEmu.Left - D(8) - D(124), D(18), D(124), D(34));
         menuBtn.SetBounds(pw - D(48), D(18), D(48), D(34));
-        head.SetBounds(D(46), D(16), Math.Max(D(60), pw - D(280)), D(36));
+        head.SetBounds(D(46), D(16), Math.Max(D(60), (saveBtn.Visible ? saveBtn.Left : addEmu.Left) - D(54)), D(36));
         {   // credit on its own small line under the title
             credit.Font = Font; credit.Height = D(20);
             int crw; using (Graphics g = CreateGraphics()) crw = credit.PreferredWidth(g);
