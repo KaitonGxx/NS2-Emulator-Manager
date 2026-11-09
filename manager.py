@@ -41,7 +41,7 @@ def cmd_build(_):
         print(r.stdout.strip() or r.stderr.strip())
     out = os.path.join(HERE, 'EmuManager.next.exe')
     args = [CSC, '/nologo', '/target:winexe', '/platform:x64', '/optimize+', '/out:' + out,
-            '/r:System.Web.Extensions.dll', '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Core.dll',
+            '/r:System.Web.Extensions.dll', '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Core.dll', '/r:Microsoft.VisualBasic.dll',
             '/win32icon:' + ICO, '/resource:' + PNG + ',app.png']
     args += ['/win32manifest:app.manifest', 'AppInfo.cs', 'FolderPicker.cs', 'EmuCore.cs', 'UserData.cs', 'EmuForm.cs']   # no setup code in the app
     r = subprocess.run(args, cwd=SRC, capture_output=True, text=True)
@@ -88,7 +88,7 @@ def cmd_installer(_):
     os.makedirs(stage)
     shutil.copyfile(os.path.join(HERE, 'EmuManager.next.exe'), os.path.join(stage, 'EmuManager.exe'))
     args = [CSC, '/nologo', '/target:winexe', '/platform:x64', '/optimize+', '/out:' + os.path.join(stage, 'Setup.exe'), '/main:SetupApp',
-            '/r:System.Web.Extensions.dll', '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Core.dll',
+            '/r:System.Web.Extensions.dll', '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Core.dll', '/r:Microsoft.VisualBasic.dll',
             '/win32icon:' + ICO, '/resource:' + PNG + ',app.png', '/win32manifest:app.manifest',
             'SetupInfo.cs', 'Setup.cs', 'FolderPicker.cs', 'EmuCore.cs', 'UserData.cs', 'EmuForm.cs']
     r = subprocess.run(args, cwd=SRC, capture_output=True, text=True)

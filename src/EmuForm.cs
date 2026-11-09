@@ -507,8 +507,25 @@ class EmuForm : Form
 
     // Launch: the first time per session that an update is known, offer it.
     readonly HashSet<string> launchAsked = new HashSet<string>();
+    // Launch only from a mouse click on it (not Space / Enter on a focused button), and never a second copy.
+    DateTime activatedAt = DateTime.MinValue, launchDown = DateTime.MinValue;
+    bool RealLaunchClick(EmuCard c)
+    {
+        double sinceDown = (DateTime.Now - launchDown).TotalMilliseconds;
+        if (sinceDown > 3000) { Log(c.Def.Name + ": Launch ignored (not a mouse click)."); return false; }
+        // already open (a stray click, or a second one): don't start it twice
+        if (Core.Running(c.Def).Count > 0)
+        {
+            Log(c.Def.Name + ": Launch ignored (it's already open).");
+            c.State.Text = c.Def.Name + " is already open."; roles[c.State] = "info"; c.State.ForeColor = RoleColor(c.State);
+            return false;
+        }
+        return true;
+    }
+
     void DoLaunch(EmuCard c)
     {
+        if (!RealLaunchClick(c)) return;
         Manifest im = Core.LoadManifest(c.Def.Dir);
         bool chosen = im != null && im.Chosen;   // an older version the user picked: don't push the update
         if (!chosen && c.Rel != null && Installed(c.Def) && !Current(c) && !IsBusy && launchAsked.Add(c.Def.Id))
@@ -563,7 +580,15 @@ class EmuForm : Form
                 {   // closed again within 8 s: tell the user instead of failing silently
                     bool quit = false; int code = 0;
                     try { quit = p.WaitForExit(8000); if (quit) code = p.ExitCode; } catch { }
-                    if (quit) UI(delegate { Log(c.Def.Name + " closed right after starting (exit code " + code + ")."); Fail(c, c.Def.Name + " closed right away. Close other emulators and try again."); });
+                    if (quit) UI(delegate
+                    {
+                        Log(c.Def.Name + " closed right after starting (exit code " + code + ").");
+                        // Eden-based emulators can restart themselves (the first process ends, a new window opens): fine
+                        if (Core.Running(c.Def).Count > 0) { Log(c.Def.Name + " is running again (it restarted itself)."); return; }
+                        bool others = cards.Any(k => k != c && Installed(k.Def) && Core.Running(k.Def).Count > 0);
+                        if (code == 0 && !others) return;   // closed normally: most likely the user closed it
+                        Fail(c, others ? c.Def.Name + " closed right away. Close other emulators and try again." : c.Def.Name + " closed right away. Try again.");
+                    });
                 });
         }
         catch (Exception ex) { Log(c.Def.Name + ": " + ex.Message); Fail(c, "Couldn't start " + c.Def.Name + "."); }
@@ -669,7 +694,7 @@ class EmuForm : Form
         DoLayout();
         Resize += delegate { DoLayout(); };
         // back from Explorer (keys copied in...): every card re-checks; a postponed question is asked now
-        Activated += delegate { if (!IsBusy) RefreshAll(); if (dupRetry && !IsBusy) BeginInvoke((MethodInvoker)AskDuplicates); if ((joinPending || joinWhy.Count > 0) && !IsBusy) { joinPending = false; joinWhy.Clear(); JoinSharing(null); } };
+        Activated += delegate { activatedAt = DateTime.Now; if (!IsBusy) RefreshAll(); if (dupRetry && !IsBusy) BeginInvoke((MethodInvoker)AskDuplicates); if ((joinPending || joinWhy.Count > 0) && !IsBusy) { joinPending = false; joinWhy.Clear(); JoinSharing(null); } };
         // first start: the welcome list (nothing is on the list yet); afterwards the usual update check
         Shown += delegate
         {
@@ -772,6 +797,41 @@ class EmuForm : Form
         f.Show(this);
     }
 
+    // Save Helper's "Remove duplicate backups": firmware backups and exact copies go to the Recycle Bin.
+    void RemoveDuplicateBackups(Action refill)
+    {
+        if (IsBusy) { PleaseWait(); return; }
+        anyBusy = true; RefreshAll(); SetFooter("Looking for duplicate backups...", Theme.Info);
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            List<KeyValuePair<string, long>> drop = null; string err = null;
+            try { drop = UserData.DuplicateBackups(); } catch (Exception ex) { err = ex.Message; }
+            UI(delegate
+            {
+                anyBusy = false; RefreshAll(); SetFooter("", Theme.Muted);
+                if (err != null) { Log("Duplicate backups: " + err); Tell("Save Helper", "That didn't work. Try again."); return; }
+                if (drop.Count == 0) { Tell("Save Helper", "There are no duplicate backups."); return; }
+                long bytes = drop.Sum(p => p.Value);
+                string size = bytes >= (1L << 30) ? (bytes / 1073741824.0).ToString("0.0") + " GB" : Math.Max(1, bytes >> 20) + " MB";
+                if (Ask("Remove duplicate backups", "Move " + drop.Count + " backup" + (drop.Count == 1 ? "" : "s") + " you don't need (" + size + ") to the Recycle Bin?\r\n\r\nThese are firmware copies and exact copies of other backups. Backups with saves you might want are kept.", "Remove", "Cancel") != 0) return;
+                anyBusy = true; RefreshAll(); SetFooter("Removing duplicate backups...", Theme.Info);
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    int done = 0; string err2 = null;
+                    foreach (KeyValuePair<string, long> p in drop)
+                        try { UserData.Recycle(p.Key, s => UI(delegate { Log(s); })); done++; }
+                        catch (Exception ex) { err2 = ex.Message; UI(delegate { Log("Could not remove " + p.Key + ": " + ex.Message); }); }
+                    UI(delegate
+                    {
+                        anyBusy = false; RefreshAll();
+                        SetFooter(err2 == null ? "Removed " + done + " duplicate backup" + (done == 1 ? "" : "s") + " (" + size + ")." : "Some backups couldn't be removed. See the log.", err2 == null ? Theme.Success : Theme.Danger);
+                        if (refill != null) refill();
+                    });
+                });
+            });
+        });
+    }
+
     // A folder path that fits: the start and the end stay, the middle becomes "...".
     static string ShortPath(string p, Font font, int width)
     {
@@ -845,6 +905,11 @@ class EmuForm : Form
         else
         {
             text("When sharing starts, saves that aren't used are kept here instead of being deleted. Restore (when you stop sharing) uses them too.", null, Theme.Muted);
+            Button dedupe = new Button(); dedupe.Text = "Remove duplicate backups"; dedupe.SetBounds(x, y, D(220), D(34)); host.Controls.Add(dedupe);
+            StyleButton(dedupe); dedupe.BackColor = Theme.Window;
+            tips.SetToolTip(dedupe, "Moves backups you don't need (firmware, and exact copies) to the Recycle Bin");
+            dedupe.Click += delegate { RemoveDuplicateBackups(refill); };
+            y += D(44);
             foreach (var a in aside.Take(20))
                 place(a.Item1 + "'s saves", "Put aside on " + a.Item3.ToString("d MMM yyyy, HH:mm") + " (" + games(UserData.CountGames(a.Item2)) + ").", a.Item2);
             if (aside.Count > 20) text("And " + (aside.Count - 20) + " older ones in the same folder.", null, Theme.Muted);
@@ -1104,6 +1169,8 @@ class EmuForm : Form
         c.Ver.AutoEllipsis = true; c.Ver.TextAlign = ContentAlignment.MiddleRight; roles[c.Ver] = "muted";
         c.Bar.Visible = false;
         c.Update.Text = "Install"; c.Launch.Text = "Launch"; c.More.Text = "...";
+        c.Launch.TabStop = false;   // keyboard focus never rests on Launch
+        c.Launch.MouseDown += delegate { launchDown = DateTime.Now; };
         Outline(c.Update, Theme.Accent); Outline(c.Launch, Theme.Accent);
         tips.SetToolTip(c.More, "More");
         c.Existing.Text = "I already have it";
@@ -1617,7 +1684,7 @@ class EmuForm : Form
             cand = cand.OrderByDescending(p => UserData.LastChanged(it, p.Value != null ? p.Value.Def : null)).ToList();
             List<string> opts = cand.Select((p, i) => "Use " + p.Key + (i == 0 ? " (newest)" : "")).ToList();
             opts.Add("Cancel");
-            int r = Ask("Shared data", "Your emulators have different " + it.Label.ToLower() + ". Which should all of them use?\r\n\r\nThe others are kept in the Shared data folder, not deleted.", opts.ToArray());
+            int r = Ask("Shared data", "Your emulators have different " + it.Label.ToLower() + ". Which should all of them use?\r\n\r\nThe others are kept in the Shared data folder (firmware goes to the Recycle Bin).", opts.ToArray());
             if (r < 0 || r == opts.Count - 1) return;
             keep[it.Key] = cand[r].Value;
         }
@@ -2586,6 +2653,15 @@ class EmuForm : Form
                     if (Core.Cfg.ShareHost == null) UserData.StartSharing(h, all, log);
                     Core.Cfg.ShareHost = h.Id; Core.Cfg.ShareNew = UserData.HostItems.Select(it => it.Key).ToList(); Core.SaveConfig();
                     log("host -> " + h.Id);
+                    continue;
+                }
+                if (a[i] == "dupes-backups" || a[i] == "dupes-backups-remove")   // test: list (and remove) duplicate backups
+                {
+                    foreach (KeyValuePair<string, long> p in UserData.DuplicateBackups())
+                    {
+                        log("duplicate backup: " + Path.GetFileName(p.Key) + " (" + (p.Value >> 20) + " MB)");
+                        if (a[i] == "dupes-backups-remove") UserData.Recycle(p.Key, log);
+                    }
                     continue;
                 }
                 if (a[i] == "host-stop" || a[i] == "host-stop-back")   // test: untick; -back = the others go back to their own saves

@@ -293,6 +293,7 @@ public static class UserData
         CheckLinks(e);
         string asideB = null, asideS = null;   // one Set aside folder per side for this item, keeping each path's place
         List<Action> undo = new List<Action>();   // paths of this item already done: put back too when a later one fails
+        List<string> recycle = new List<string>();   // copies not worth keeping as backups (firmware; keys the same as the shared ones)
         foreach (string rel in it.Paths)
         {
             string b = Path.Combine(user, rel), s = Path.Combine(SharedRoot, rel);
@@ -303,12 +304,20 @@ public static class UserData
             {
                 if (bHas && sHas)
                 {
-                    if (SameTree(b, s) || prefer != "build") { if (asideB == null) asideB = NewAside(e.Name + " - " + it.Label); movedB = SetAside(b, asideB, rel, log); }
+                    bool same = SameTree(b, s);
+                    if (same || prefer != "build")
+                    {
+                        if (asideB == null) asideB = NewAside(e.Name + " - " + it.Label); movedB = SetAside(b, asideB, rel, log);
+                        // firmware isn't kept; keys identical to the shared ones aren't either, nor the ticked one's saves when
+                        // they're the same as the shared ones (it keeps the latest anyway)
+                        if (it.Key == "firmware" || (it.Key == "keys" && same) || (it.Key == "saves" && same && prefer == "build")) recycle.Add(movedB);
+                    }
                     else
                     {
                         if (asideS == null) asideS = NewAside("Shared - " + it.Label);
                         movedS = SetAside(s, asideS, rel, log);
                         MoveTree(b, s, log); bToS = true;
+                        if (it.Key == "firmware") recycle.Add(movedS);
                     }
                 }
                 else if (bHas)
@@ -333,7 +342,76 @@ public static class UserData
             }
             log(e.Name + ": " + rel + " -> " + s);
         }
-        return asideB;
+        // everything is linked: copies that aren't kept as backups go to the Recycle Bin (firmware is installed once
+        // per emulator anyway; keys identical to the shared ones are just duplicates)
+        foreach (string r in recycle) try { Recycle(r, log); } catch (Exception ex) { log("Could not move " + r + " to the Recycle Bin: " + ex.Message); }
+        foreach (string a in new[] { asideB, asideS })
+            if (a != null && Directory.Exists(a) && !HasFiles(a)) try { DeleteEmptyTree(a); } catch { }
+        return asideB != null && Directory.Exists(asideB) ? asideB : null;
+    }
+
+    // Same files in both, or neither has any (a folder that doesn't exist counts as empty).
+    static bool SameOrEmpty(string a, string b)
+    {
+        bool ha = HasFiles(a), hb = HasFiles(b);
+        if (!ha || !hb) return ha == hb;
+        return SameTree(a, b);
+    }
+
+    // Sends a folder to the Recycle Bin (the user can still get it back). In a test environment it goes to
+    // <test folder>\.recycled instead, so tests never fill the real Recycle Bin.
+    public static void Recycle(string dir, Action<string> log)
+    {
+        if (!Directory.Exists(dir)) return;
+        if (FindReparse(dir) != null) throw new Exception(FindReparse(dir) + " is a link; not recycling it.");
+        if (Core.Cfg != null && Core.Cfg.Sandbox)
+        {
+            string bin = Path.Combine(Core.Home, ".recycled", DateTime.Now.ToString("HHmmssfff") + " " + Path.GetFileName(dir));
+            MoveTree(dir, bin, log);
+        }
+        else Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(dir, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+        log("Moved to the Recycle Bin: " + dir);
+    }
+
+    // Backups in Set aside that aren't needed: firmware (while firmware is installed somewhere), keys identical to the
+    // ones in use or to another kept backup, and saves identical to another backup (the newest copy is kept). Backups
+    // that "Restore" still needs are never listed. Returns (folder, bytes).
+    public static List<KeyValuePair<string, long>> DuplicateBackups()
+    {
+        List<KeyValuePair<string, long>> drop = new List<KeyValuePair<string, long>>();
+        string root = Path.Combine(SharedRoot, SET_ASIDE);
+        if (!Directory.Exists(root)) return drop;
+        HashSet<string> needed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (Core.Cfg.ShareBackups != null) foreach (List<string> l in Core.Cfg.ShareBackups.Values) foreach (string p in l) needed.Add(Full(p));
+        string fwRel = @"nand\system\Contents";
+        bool fwInUse = HasFiles(Path.Combine(SharedRoot, fwRel)) || Core.Cfg.Emulators.Any(e => IsPortable(e) && HasFiles(Path.Combine(UserDir(e), fwRel)));
+        List<string> inUseKeys = new[] { Path.Combine(SharedRoot, "keys") }.Concat(Core.Cfg.Emulators.Where(IsPortable).Select(e => Path.Combine(UserDir(e), "keys"))).Where(HasFiles).ToList();
+        List<string> keptKeys = new List<string>(), keptSaves = new List<string>();
+        // newest first, so the newest copy of something is the one kept
+        foreach (string d in Directory.GetDirectories(root).OrderByDescending(Directory.GetCreationTime))
+        {
+            if (FindReparse(d) != null || needed.Contains(Full(d))) continue;
+            List<string> parts = Directory.GetFileSystemEntries(d, "*", SearchOption.AllDirectories).Where(File.Exists).ToList();
+            if (parts.Count == 0) { drop.Add(new KeyValuePair<string, long>(d, 0)); continue; }
+            string fw = Path.Combine(d, fwRel), keys = Path.Combine(d, "keys"), nu = Path.Combine(d, @"nand\user"), ns = Path.Combine(d, @"nand\system\save");
+            bool onlyFw = HasFiles(fw) && !HasFiles(keys) && !HasFiles(nu) && !HasFiles(ns);
+            bool onlyKeys = HasFiles(keys) && !HasFiles(fw) && !HasFiles(nu) && !HasFiles(ns);
+            bool onlySaves = (HasFiles(nu) || HasFiles(ns)) && !HasFiles(fw) && !HasFiles(keys);
+            long size = parts.Sum(f => new FileInfo(f).Length);
+            if (onlyFw) { if (fwInUse) drop.Add(new KeyValuePair<string, long>(d, size)); continue; }
+            if (onlyKeys)
+            {
+                if (inUseKeys.Any(k => SameOrEmpty(k, keys)) || keptKeys.Any(k => SameOrEmpty(k, keys))) drop.Add(new KeyValuePair<string, long>(d, size));
+                else keptKeys.Add(keys);
+                continue;
+            }
+            if (onlySaves)
+            {
+                if (keptSaves.Any(k => SameOrEmpty(Path.Combine(k, @"nand\user"), nu) && SameOrEmpty(Path.Combine(k, @"nand\system\save"), ns))) drop.Add(new KeyValuePair<string, long>(d, size));
+                else keptSaves.Add(d);
+            }
+        }
+        return drop;
     }
 
     // Undoes one path of Share: the link goes, and what was moved goes back where it was.
