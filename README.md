@@ -33,6 +33,10 @@ Made by **Riskbreak** (Discord).
 
 ![Choose version list](docs/choose-version.png)
 
+**Pick your colours** from 16 themes with the Themes button.
+
+![Themes window](docs/themes.png)
+
 **No emulators yet:** one click to pick some.
 
 ![Main window with no emulators](docs/no-emulators.png)
