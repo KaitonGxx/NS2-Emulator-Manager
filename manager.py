@@ -17,9 +17,8 @@ LNK = os.path.join(os.path.expanduser('~'), 'Desktop', 'Switch 2 Emulators.lnk')
 PNG = os.path.join(SRC, 'app.png')
 SANDBOX = os.path.join(HERE, 'sandbox')
 LNK_TEST = os.path.join(os.path.expanduser('~'), 'Desktop', 'Switch 2 Emulators (Test).lnk')
-# Eglantine main's flower (the same art as its dist\eden.ico); src\make_icon.ps1 adds the wrench badge.
-# Delete src\app.ico and src\app.png to rebuild them on the next build.
-ICON_FROM = os.environ.get('EGLANTINE_PNG', os.path.join(HERE, 'Eglantine.png'))   # only needed to rebuild the icon
+# The icon is drawn from src\icon.html by src\make_icon.py (with Edge). Delete src\app.ico and src\app.png to draw
+# them again on the next build; only that needs Microsoft Edge and Pillow, a normal build doesn't.
 
 
 def ps(script):
@@ -33,16 +32,18 @@ def running():
 
 def cmd_build(_):
     if not (os.path.exists(ICO) and os.path.exists(PNG)):
-        if not os.path.exists(ICON_FROM):
-            print('icon source missing:', ICON_FROM)
-            return 1
-        r = subprocess.run(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', os.path.join(SRC, 'make_icon.ps1'), ICON_FROM],
-                           capture_output=True, text=True)
+        r = subprocess.run([sys.executable, os.path.join(SRC, 'make_icon.py')], capture_output=True, text=True)
         print(r.stdout.strip() or r.stderr.strip())
+        if not (os.path.exists(ICO) and os.path.exists(PNG)):
+            return 1
     out = os.path.join(HERE, 'EmuManager.next.exe')
     args = [CSC, '/nologo', '/target:winexe', '/platform:x64', '/optimize+', '/out:' + out,
             '/r:System.Web.Extensions.dll', '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Core.dll', '/r:Microsoft.VisualBasic.dll',
-            '/win32icon:' + ICO, '/resource:' + PNG + ',app.png']
+            '/win32icon:' + ICO, '/resource:' + PNG + ',app.png', '/resource:' + ICO + ',app.ico']
+    # the built-in emulators' own logos for their cards (src\badges\<id>.png -> resource badge-<id>.png)
+    for f in sorted(os.listdir(os.path.join(SRC, 'badges'))):
+        if f.lower().endswith('.png'):
+            args.append('/resource:' + os.path.join(SRC, 'badges', f) + ',badge-' + f.lower())
     args += ['/win32manifest:app.manifest', 'AppInfo.cs', 'FolderPicker.cs', 'EmuCore.cs', 'UserData.cs', 'EmuForm.cs']   # no setup code in the app
     r = subprocess.run(args, cwd=SRC, capture_output=True, text=True)
     if r.returncode != 0:
@@ -89,7 +90,7 @@ def cmd_installer(_):
     shutil.copyfile(os.path.join(HERE, 'EmuManager.next.exe'), os.path.join(stage, 'EmuManager.exe'))
     args = [CSC, '/nologo', '/target:winexe', '/platform:x64', '/optimize+', '/out:' + os.path.join(stage, 'Setup.exe'), '/main:SetupApp',
             '/r:System.Web.Extensions.dll', '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Core.dll', '/r:Microsoft.VisualBasic.dll',
-            '/win32icon:' + ICO, '/resource:' + PNG + ',app.png', '/win32manifest:app.manifest',
+            '/win32icon:' + ICO, '/resource:' + PNG + ',app.png', '/resource:' + ICO + ',app.ico', '/win32manifest:app.manifest',
             'SetupInfo.cs', 'Setup.cs', 'FolderPicker.cs', 'EmuCore.cs', 'UserData.cs', 'EmuForm.cs']
     r = subprocess.run(args, cwd=SRC, capture_output=True, text=True)
     if r.returncode != 0:

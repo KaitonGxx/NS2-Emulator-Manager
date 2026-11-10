@@ -21,7 +21,7 @@ using Microsoft.Win32;
 
 static class SetupApp
 {
-    public const string APP = "NS2 Emulator Manager", VERSION = "1.2.19", PUBLISHER = "NS2 Emulator Manager";
+    public const string APP = "NS2 Emulator Manager", VERSION = "1.3.4", PUBLISHER = "NS2 Emulator Manager";
     public const string KEY = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Switch2EmulatorManager";
     public static string DesktopLnk { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "NS2 Emulator Manager.lnk"); } }
     public static string StartLnk { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "NS2 Emulator Manager.lnk"); } }
@@ -38,6 +38,20 @@ static class SetupApp
                 string d = k == null ? null : k.GetValue("InstallLocation") as string;
                 return !string.IsNullOrEmpty(d) && File.Exists(Path.Combine(d, "EmuManager.exe")) ? d : null;
             }
+        }
+        catch { return null; }
+    }
+
+    // The colours the user picked in the manager installed in dir (null: the default ones).
+    static string ColorsOf(string dir)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(dir)) return null;
+            string f = Path.Combine(dir, "emulators.json");
+            if (!File.Exists(f)) return null;
+            System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(f), "\"Colors\"\\s*:\\s*\"(\\w+)\"");
+            return m.Success ? m.Groups[1].Value : null;
         }
         catch { return null; }
     }
@@ -62,17 +76,19 @@ static class SetupApp
         catch (Exception ex) { try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "emu-manager-setup.log"), ex + "\r\n"); } catch { } return 1; }
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        Theme.Set(Theme.SystemDark());
         if (args.Contains("--uninstall"))
         {
             string dir = InstalledDir() ?? Path.GetDirectoryName(Application.ExecutablePath);
+            Theme.Set(ColorsOf(dir));
             Application.Run(new SetupForm(true, dir));
         }
         else
         {   // --update DIR: started by the manager in DIR to update itself (its folder, even without an Apps entry)
             int ui = Array.IndexOf(args, "--update");
             string pre = ui >= 0 && ui + 1 < args.Length && File.Exists(Path.Combine(args[ui + 1], "EmuManager.exe")) ? Path.GetFullPath(args[ui + 1]).TrimEnd('\\') : null;
-            Application.Run(new SetupForm(false, pre ?? InstalledDir()));
+            string home = pre ?? InstalledDir();
+            Theme.Set(ColorsOf(home));
+            Application.Run(new SetupForm(false, home));
         }
         return 0;
     }
@@ -116,6 +132,7 @@ static class SetupApp
         if (File.Exists(exe)) File.Delete(exe);
         File.Move(tmp, exe);
         log("Copied EmuManager.exe");
+        string icon = WriteIcon(dir, log) ?? exe;
         string un = Path.Combine(dir, "Uninstall.exe");
         if (!string.Equals(Path.GetFullPath(Application.ExecutablePath), Path.GetFullPath(un), StringComparison.OrdinalIgnoreCase))
         { File.Copy(Application.ExecutablePath, un, true); log("Copied Uninstall.exe"); }
@@ -124,7 +141,7 @@ static class SetupApp
             using (RegistryKey k = Registry.CurrentUser.CreateSubKey(KEY))
             {
                 k.SetValue("DisplayName", APP); k.SetValue("DisplayVersion", VERSION); k.SetValue("Publisher", PUBLISHER);
-                k.SetValue("DisplayIcon", exe + ",0"); k.SetValue("InstallLocation", dir);
+                k.SetValue("DisplayIcon", icon + ",0"); k.SetValue("InstallLocation", dir);
                 k.SetValue("UninstallString", "\"" + un + "\" --uninstall");
                 k.SetValue("InstallDate", DateTime.Now.ToString("yyyyMMdd"));
                 k.SetValue("EstimatedSize", (int)Math.Max(1, (payload.Length + new FileInfo(un).Length) / 1024), RegistryValueKind.DWord);
@@ -139,7 +156,7 @@ static class SetupApp
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(sc.Key));
-                Shortcut(sc.Key, exe, dir, "Install, update and launch your Switch 2 emulators");
+                Shortcut(sc.Key, exe, dir, "Install, update and launch your Switch 2 emulators", icon);
                 if (!File.Exists(sc.Key)) throw new Exception("the shortcut file wasn't created");
                 log(sc.Value + " shortcut");
             }
@@ -151,14 +168,29 @@ static class SetupApp
         }
         foreach (string l in OldLnks)   // the same shortcut under the old name
             try { if (File.Exists(l) && LinkTarget(l).Equals(exe, StringComparison.OrdinalIgnoreCase)) { File.Delete(l); log("Removed old shortcut " + Path.GetFileName(l)); } } catch { }
-        RefreshIcons();
+        RefreshIcons(exe, icon, DesktopLnk, StartLnk);
         FileLog(warn.Count == 0 ? "done" : "done with warnings: " + string.Join("; ", warn));
         return string.Join("  ", warn);
     }
 
-    // Tells Explorer to drop its cached icons, so shortcuts show the app's own icon right away (not an old one).
+    // Tells Explorer to drop its cached icons, so shortcuts show the app's own icon right away (not an old one after an
+    // update that changed it): each file is marked changed, then Windows' own icon refresh runs (ie4uinit -show).
+    [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    static extern void SHChangeNotify(int eventId, int flags, string a, IntPtr b);
     [System.Runtime.InteropServices.DllImport("shell32.dll")] static extern void SHChangeNotify(int eventId, int flags, IntPtr a, IntPtr b);
-    public static void RefreshIcons() { try { SHChangeNotify(0x08000000, 0, IntPtr.Zero, IntPtr.Zero); } catch { } }   // SHCNE_ASSOCCHANGED
+    public static void RefreshIcons(params string[] files)
+    {
+        try
+        {
+            foreach (string f in files)
+                if (!string.IsNullOrEmpty(f) && File.Exists(f)) SHChangeNotify(0x00002000, 0x0005, f, IntPtr.Zero);   // SHCNE_UPDATEITEM, SHCNF_PATHW
+            SHChangeNotify(0x08000000, 0, IntPtr.Zero, IntPtr.Zero);   // SHCNE_ASSOCCHANGED
+            string ie = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "ie4uinit.exe");
+            if (File.Exists(ie))
+                using (Process p = Process.Start(new ProcessStartInfo(ie, "-show") { UseShellExecute = false, CreateNoWindow = true })) p.WaitForExit(10000);
+        }
+        catch { }
+    }
 
     // Removes what setup installed. Builds, saves, downloads and previous builds in dir always stay.
     // Returns true when Uninstall.exe itself is running (so it stays in the folder).
@@ -168,6 +200,7 @@ static class SetupApp
         string exe = Path.Combine(dir, "EmuManager.exe");
         if (File.Exists(exe)) { File.Delete(exe); log("Removed EmuManager.exe"); }
         foreach (string f in new[] { "EmuManager.next.exe", "EmuManager.exe.new" }) try { File.Delete(Path.Combine(dir, f)); } catch { }
+        try { foreach (string f in Directory.GetFiles(dir, "EmuManager-*.ico")) File.Delete(f); } catch { }   // the shortcuts' icon
         if (settings)
             foreach (string f in new[] { "emulators.json", "emulators.json.tmp", "manager.log" })
                 if (File.Exists(Path.Combine(dir, f))) { File.Delete(Path.Combine(dir, f)); log("Removed " + f); }
@@ -186,7 +219,33 @@ static class SetupApp
         return self;
     }
 
-    static void Shortcut(string lnk, string target, string dir, string desc)
+    // The app's icon as a file named after its picture (EmuManager-1a2b3c4d.ico): Windows remembers icons by where they
+    // come from, so a new picture gets a new name and the shortcuts show it at once. Uninstall removes them all.
+    static string WriteIcon(string dir, Action<string> log)
+    {
+        try
+        {
+            byte[] bytes;
+            using (Stream s = typeof(SetupApp).Assembly.GetManifestResourceStream("app.ico"))
+            {
+                if (s == null) return null;
+                using (MemoryStream m = new MemoryStream()) { s.CopyTo(m); bytes = m.ToArray(); }
+            }
+            string id;
+            using (System.Security.Cryptography.SHA1 h = System.Security.Cryptography.SHA1.Create())
+                id = BitConverter.ToString(h.ComputeHash(bytes)).Replace("-", "").Substring(0, 8).ToLowerInvariant();
+            string ico = Path.Combine(dir, "EmuManager-" + id + ".ico");
+            File.WriteAllBytes(ico, bytes);
+            // older ones stay, with the new picture: a taskbar pin or copied shortcut may still point at one
+            foreach (string old in Directory.GetFiles(dir, "EmuManager-*.ico"))
+                if (!string.Equals(old, ico, StringComparison.OrdinalIgnoreCase)) try { File.WriteAllBytes(old, bytes); } catch { }
+            log("Icon " + Path.GetFileName(ico));
+            return ico;
+        }
+        catch (Exception ex) { FileLog("Icon file: " + ex.Message); return null; }
+    }
+
+    static void Shortcut(string lnk, string target, string dir, string desc, string icon)
     {
         Type t = Type.GetTypeFromProgID("WScript.Shell");
         object sh = Activator.CreateInstance(t);
@@ -195,7 +254,7 @@ static class SetupApp
         st.InvokeMember("TargetPath", BindingFlags.SetProperty, null, s, new object[] { target });
         st.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, s, new object[] { dir });
         st.InvokeMember("Description", BindingFlags.SetProperty, null, s, new object[] { desc });
-        st.InvokeMember("IconLocation", BindingFlags.SetProperty, null, s, new object[] { target + ",0" });
+        st.InvokeMember("IconLocation", BindingFlags.SetProperty, null, s, new object[] { (icon ?? target) + ",0" });
         st.InvokeMember("Save", BindingFlags.InvokeMethod, null, s, null);
     }
 
@@ -213,7 +272,7 @@ static class SetupApp
 
     public static Bitmap Logo()
     {
-        try { using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream("app.png")) return s == null ? null : new Bitmap(s); }
+        try { using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream("app.png")) { if (s == null) return null; using (Bitmap b = new Bitmap(s)) return new Bitmap(b); } }
         catch { return null; }
     }
 }
@@ -221,6 +280,8 @@ static class SetupApp
 // One window for both: install (folder, shortcuts, start when done) or uninstall (keep / remove settings).
 class SetupForm : Form
 {
+    static bool Offscreen { get { return Environment.GetEnvironmentVariable("NS2_DEMO_OFFSCREEN") == "1"; } }
+    protected override bool ShowWithoutActivation { get { return Offscreen; } }
     readonly bool uninstall;
     readonly string existing;
     readonly TextBox dir = new TextBox();
@@ -233,9 +294,10 @@ class SetupForm : Form
     {
         this.uninstall = uninstall; this.existing = existing;
         Text = uninstall ? "Uninstall " + SetupApp.APP : SetupApp.APP + " Setup";
-        try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+        Icon = EmuForm.AppIcon();
         Font = Theme.Body; BackColor = Theme.Window; ForeColor = Theme.Text;
         FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false; StartPosition = FormStartPosition.CenterScreen;
+        if (Offscreen) { StartPosition = FormStartPosition.Manual; Location = new Point(-30000, -30000); }   // screenshots in tests
         ClientSize = new Size(600, 400);
 
         PictureBox logo = new PictureBox(); logo.Image = SetupApp.Logo(); logo.SizeMode = PictureBoxSizeMode.Zoom; logo.SetBounds(24, 22, 64, 64); Controls.Add(logo);
@@ -282,7 +344,7 @@ class SetupForm : Form
             go.Click += delegate { DoUninstall(); };
         }
         foreach (Button b in new[] { go, cancel, browse }) { EmuForm.StyleButton(b); b.BackColor = b == browse ? Theme.Card : Theme.Window; b.ForeColor = Theme.Text; }
-        EmuForm.Outline(go, uninstall ? Color.Crimson : Color.ForestGreen);
+        EmuForm.Outline(go, uninstall ? Color.Crimson : Theme.Accent);
         info.ForeColor = Theme.Text;
         foreach (Control k in Controls.Cast<Control>().Concat(box.Controls.Cast<Control>())) { Label l = k as Label; if (l != null) { l.UseMnemonic = false; l.AutoEllipsis = true; } }   // "Apps & features" shows its &
         HandleCreated += delegate { Native.Apply(Handle, Theme.Dark, 0); Native.ControlTheme(dir.Handle, Theme.Dark ? "DarkMode_Explorer" : "Explorer"); };

@@ -16,36 +16,54 @@ using System.Windows.Forms;
 
 static class Theme
 {
-    public static bool Dark;
-    public static Color Window, Sidebar, Card, Stroke, StrokeStrong, Text, Muted, Disabled, Accent, AccentText, Input,
-                        Control, ControlHover, ControlPressed, ControlOff, NavHover, NavSelected, Danger, Success, Warn, Info;
-    public static Font Body, Small, Title, CardTitle, Header, Nav, Icon;
-
-    public static void Set(bool dark)
+    public static bool Dark = true;
+    public static Color Window, Sidebar, Card, Stroke, StrokeStrong, Text, Muted, Disabled, Accent, Accent2, Accent3, AccentText, Input,
+                        Control, ControlHover, ControlPressed, ControlOff, NavHover, NavSelected, Danger, Success, Warn, Info, Glow1, Glow2;
+    public static Font Body, Small, Title, CardTitle, Header, Nav, Icon, Big, Caption, Value, Strong, Name, Large, Glyph;
+    public static string Scheme = "purple";
+    // The colour schemes the user can pick (Colors... in the "..." menu): id, name, background, tile, raised tile, line,
+    // text, muted text, accent, second accent (gradients), two background glows, text on the accent, a third colour.
+    public static readonly string[][] Schemes =
     {
-        Dark = dark;
-        if (dark)
-        {
-            Window = Rgb(0x202020); Sidebar = Rgb(0x1a1a1a); Card = Rgb(0x2b2b2b); Stroke = Rgb(0x3a3a3a); StrokeStrong = Rgb(0x8a8a8a);
-            Text = Rgb(0xf3f3f3); Muted = Rgb(0xa8a8a8); Disabled = Rgb(0x6e6e6e); Accent = Rgb(0x60cdff); AccentText = Rgb(0x0a1a24);
-            Input = Rgb(0x1f1f1f); Control = Rgb(0x373737); ControlHover = Rgb(0x404040); ControlPressed = Rgb(0x313131); ControlOff = Rgb(0x2f2f2f);
-            NavHover = Color.FromArgb(0x10, 255, 255, 255); NavSelected = Color.FromArgb(0x1c, 255, 255, 255);
-            Danger = Rgb(0xff99a4); Success = Rgb(0x6ccb5f); Warn = Rgb(0xfce100); Info = Rgb(0x99ebff);
-        }
-        else
-        {
-            Window = Rgb(0xf3f3f3); Sidebar = Rgb(0xe9e9e9); Card = Rgb(0xffffff); Stroke = Rgb(0xe3e3e3); StrokeStrong = Rgb(0x8a8a8a);
-            Text = Rgb(0x1b1b1b); Muted = Rgb(0x5f5f5f); Disabled = Rgb(0xa0a0a0); Accent = Rgb(0x005fb8); AccentText = Rgb(0xffffff);
-            Input = Rgb(0xffffff); Control = Rgb(0xfbfbfb); ControlHover = Rgb(0xf3f3f3); ControlPressed = Rgb(0xebebeb); ControlOff = Rgb(0xf5f5f5);
-            NavHover = Color.FromArgb(0x0c, 0, 0, 0); NavSelected = Color.FromArgb(0x14, 0, 0, 0);
-            Danger = Rgb(0xc42b1c); Success = Rgb(0x0f7b0f); Warn = Rgb(0x9d5d00); Info = Rgb(0x005fb8);
-        }
+        new[] { "purple",   "Purple",   "0e0b16", "1a1626", "211c30", "2d2640", "ece8f6", "9a93b0", "9b6bff", "e66bd6", "3b2266", "3a1d4f", "ffffff", "7fb3ff" },
+        new[] { "lavender", "Lavender", "100e17", "1b1826", "221e30", "302a42", "f1edfb", "a59eba", "c4b5fd", "f0abfc", "2e2550", "3a2244", "1b1430", "93c5fd" },
+        new[] { "midnight", "Midnight", "0a0c1a", "141830", "1a1f3d", "262c52", "e8ebff", "9097c0", "5566ff", "8b5cf6", "1e2766", "241a55", "ffffff", "38bdf8" },
+        new[] { "ocean",    "Ocean",    "071118", "0f1d27", "142633", "1f3442", "e6f3f8", "8aa4b2", "2ec5d3", "3b82f6", "0f3b52", "10304a", "ffffff", "a78bfa" },
+        new[] { "arctic",   "Arctic",   "0b1016", "141b24", "19222d", "26313f", "eef5fb", "94a3b4", "a5f3fc", "c7d2fe", "163243", "1f2547", "0b1620", "fda4af" },
+        new[] { "neon",     "Neon",     "0a0a12", "13131f", "191928", "262638", "f0f0ff", "9a9ab8", "00e5ff", "ff2bd6", "08343d", "3d0838", "0a0a12", "b6ff3b" },
+        new[] { "emerald",  "Emerald",  "08110d", "111d18", "16261f", "22362d", "e7f6ef", "8fae9f", "22c55e", "a3e635", "123d28", "1f3a10", "0b1a10", "2dd4bf" },
+        new[] { "matcha",   "Matcha",   "0d100b", "171c14", "1d2319", "2b3324", "eef3e6", "9fab92", "a7c957", "dde5b6", "26331a", "2f3416", "141a0c", "e9c46a" },
+        new[] { "amber",    "Amber",    "110e07", "1d1a10", "262114", "383020", "fbf5e6", "b5a888", "f5b301", "ff7a1a", "4a3608", "3d2008", "1a1204", "6ec1ff" },
+        new[] { "sunset",   "Sunset",   "120c08", "1f1611", "281c15", "3a2a20", "f8efe8", "b39d8e", "ff8a3d", "ff4f8b", "4a2410", "4a1530", "ffffff", "ffd166" },
+        new[] { "mocha",    "Mocha",    "120d0a", "1e1712", "271e18", "382b22", "f7efe8", "b09d8f", "d4a373", "e9c46a", "3d2617", "2f2416", "1a120c", "8ecae6" },
+        new[] { "ruby",     "Ruby",     "12080a", "1f0f13", "291419", "3c1d24", "fbe9ec", "b6949b", "e11d48", "f43f5e", "4f0f1c", "3a0d22", "ffffff", "fbbf24" },
+        new[] { "joycon",   "Joy-Con",  "100b0d", "1c1517", "24191c", "33262a", "f6ecee", "a8979b", "ff4d5e", "2f9bff", "4a1520", "12304f", "ffffff", "ffd23f" },
+        new[] { "sakura",   "Sakura",   "140b10", "21141b", "2a1922", "3b2531", "f8eaf0", "b398a6", "ff7eb6", "ffb38a", "4a1a33", "3d1f2a", "2a0f1c", "c4b5fd" },
+        new[] { "lychee",   "Lychee",   "120a0c", "1f1215", "29171b", "3b2228", "fbecee", "b3979c", "f0386b", "e8457a", "4d1424", "1d3a17", "ffffff", "7ed957" },
+        new[] { "graphite", "Graphite", "0c0c0e", "17171a", "1e1e22", "2b2b31", "f2f2f4", "9a9aa3", "e5e5ea", "a1a1aa", "2a2a30", "202026", "111114", "7fb3ff" },
+    };
+
+    public static void Set(bool dark) { Set(Scheme); }   // older callers (Setup): the current scheme
+    public static void Set(string name)
+    {
+        string[] c = Schemes.FirstOrDefault(x => x[0] == name) ?? Schemes[0];
+        Scheme = c[0]; Dark = true;
+        Func<int, Color> h = i => Rgb(Convert.ToInt32(c[i], 16));
+        Window = h(2); Sidebar = Window; Card = h(3); Input = h(4); Stroke = h(5); Text = h(6); Muted = h(7);
+        Accent = h(8); Accent2 = h(9); Glow1 = h(10); Glow2 = h(11); AccentText = h(12); Accent3 = h(13);
+        StrokeStrong = Blend(Stroke, Muted, 0.45); Disabled = Blend(Muted, Window, 0.45);
+        Control = Input; ControlHover = Blend(Input, Accent, 0.14); ControlPressed = Blend(Input, Accent, 0.24); ControlOff = Blend(Card, Window, 0.4);
+        NavHover = Color.FromArgb(0x14, 255, 255, 255); NavSelected = Color.FromArgb(0x22, 255, 255, 255);
+        Danger = Rgb(0xff7b8a); Success = Rgb(0x5fd39a); Warn = Rgb(0xf5c451); Info = Rgb(0x7fb3ff);
         if (Body == null)
         {
             string text = Family("Segoe UI"), semi = Family("Segoe UI Variable Display Semibold", "Segoe UI Semibold"), icons = Family("Segoe Fluent Icons", "Segoe MDL2 Assets");
+            string light = Family("Segoe UI Variable Display Light", "Segoe UI Light", "Segoe UI");
             Body = new Font(text, 9.5f); Small = new Font(text, 9f); Nav = new Font(text, 10f);
             Title = new Font(semi, 10.5f); CardTitle = new Font(semi, 12f); Header = new Font(semi, 16f);
-            Icon = new Font(icons, 12f);
+            Big = new Font(light, 28f); Value = new Font(semi, 13f); Caption = new Font(semi, 9f);
+            Strong = new Font(semi, 9.5f); Name = new Font(semi, 15f); Large = new Font(text, 11.5f);
+            Icon = new Font(icons, 12f); Glyph = new Font(icons, 7.5f);
         }
     }
 
@@ -63,7 +81,61 @@ static class Theme
         return Color.FromArgb(255, (int)(a.R + (b.R - a.R) * t), (int)(a.G + (b.G - a.G) * t), (int)(a.B + (b.B - a.B) * t));
     }
 
-    public static Color Tint(Color c) { return Dark ? Blend(c, Color.White, 0.28) : c; }
+    public static Color Tint(Color c) { return c; }
+
+    // The two soft glows on the window background, drawn so they line up across every panel that shows them.
+    // Drawn once per window size and scheme, then copied: every control on the window background shows its part of it.
+    static Bitmap glowCache; static Size glowSize; static string glowScheme;
+    public static void PaintGlow(Graphics g, Control c)
+    {
+        Form f = c.FindForm();
+        Size sz = f != null ? f.ClientSize : Size.Empty;
+        if (sz.Width < 1 || sz.Height < 1) { g.Clear(Window); return; }
+        if (glowCache == null || glowSize != sz || glowScheme != Scheme)
+        {
+            if (glowCache != null) glowCache.Dispose();
+            glowCache = new Bitmap(sz.Width, sz.Height, PixelFormat.Format32bppPArgb);
+            using (Graphics b = Graphics.FromImage(glowCache))
+            {
+                float W = sz.Width, H = sz.Height;
+                b.Clear(Window);
+                b.SmoothingMode = SmoothingMode.AntiAlias;
+                GlowAt(b, Glow1, new RectangleF(W * 0.20f, -H * 0.62f, W * 1.15f, H * 1.05f), 220);
+                GlowAt(b, Glow2, new RectangleF(-W * 0.55f, H * 0.55f, W * 0.95f, H * 0.95f), 220);
+            }
+            glowSize = sz; glowScheme = Scheme;
+        }
+        Point o = f.PointToClient(c.PointToScreen(Point.Empty));
+        g.DrawImage(glowCache, new Rectangle(-o.X, -o.Y, sz.Width, sz.Height), 0, 0, sz.Width, sz.Height, GraphicsUnit.Pixel);
+    }
+    public static void GlowAt(Graphics g, Color col, RectangleF r, int alpha)
+    {
+        if (r.Width < 1 || r.Height < 1) return;
+        using (GraphicsPath p = new GraphicsPath())
+        {
+            p.AddEllipse(r);
+            using (PathGradientBrush b = new PathGradientBrush(p))
+            { b.CenterColor = Color.FromArgb(alpha, col); b.SurroundColors = new[] { Color.FromArgb(0, col) }; g.FillPath(b, p); }
+        }
+    }
+    // What is behind a control: its tile, the window glow, or its parent's colour.
+    public static void ParentBack(Graphics g, Control c)
+    {
+        Control p = c.Parent;
+        IBack b = p as IBack;
+        if (b != null) b.PaintBack(g, c.Bounds);
+        else if (p is GlowPanel) PaintGlow(g, c);
+        else g.Clear(p != null && p.BackColor.A == 255 ? p.BackColor : Window);
+    }
+    // The accent gradient (buttons, switches); light > 0 brightens it (hover), < 0 darkens it (pressed).
+    public static LinearGradientBrush AccentBrush(RectangleF r, double light)
+    {
+        Color a = Accent, b = Accent2;
+        if (light > 0) { a = Blend(a, Color.White, light); b = Blend(b, Color.White, light); }
+        if (light < 0) { a = Blend(a, Color.Black, -light); b = Blend(b, Color.Black, -light); }
+        return new LinearGradientBrush(new RectangleF(r.X - 1, r.Y - 1, r.Width + 2, r.Height + 2), a, b, 30f);
+    }
+    public static Color Hex(string h) { return Rgb(Convert.ToInt32(h, 16)); }
 
     public static bool SystemDark()
     {
@@ -135,10 +207,37 @@ static class Native
         else if (Build >= 22000 && comp) on = Attr(h, 1029, 1) == 0;
         MARGINS m = new MARGINS(); m.L = on ? glassWidth : 0;
         try { DwmExtendFrameIntoClientArea(h, ref m); } catch { on = false; }
+        if (Build >= 22000)
+        {   // title bar and edge in the colour scheme (Windows 11)
+            Attr(h, 35, Ref(Theme.Window)); Attr(h, 36, Ref(Theme.Text)); Attr(h, 34, Ref(Theme.Stroke));
+        }
         return on;
     }
+    static int Ref(Color c) { return c.R | c.G << 8 | c.B << 16; }
+    public static void Raise(IntPtr h) { try { SetWindowPos(h, IntPtr.Zero, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010); } catch { } }
+    public static void Below(IntPtr h, IntPtr after) { try { SetWindowPos(h, after, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010); } catch { } }
+    public static void RoundPopup(IntPtr h) { if (Build >= 22000) { Attr(h, 33, 3); Attr(h, 34, Ref(Theme.Stroke)); } }
+
+    [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+    [DllImport("user32.dll")] public static extern bool IsZoomed(IntPtr h);
+    // The frame is measured again (after WM_NCCALCSIZE changes what it covers).
+    public static void FrameChanged(IntPtr h) { try { SetWindowPos(h, IntPtr.Zero, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0004 | 0x0010 | 0x0020); } catch { } }
 
     public static void ControlTheme(IntPtr h, string name) { try { SetWindowTheme(h, name, null); } catch { } }
+
+    [StructLayout(LayoutKind.Sequential)] struct RECT { public int L, T, R, B; }
+    [StructLayout(LayoutKind.Sequential)] struct COMBOBOXINFO { public int cbSize; public RECT rcItem, rcButton; public int stateButton; public IntPtr hwndCombo, hwndItem, hwndList; }
+    [DllImport("user32.dll")] static extern bool GetComboBoxInfo(IntPtr h, ref COMBOBOXINFO i);
+    // A drop-down's list (its own window) with a dark scroll bar.
+    public static void DarkList(ComboBox c)
+    {
+        try
+        {
+            COMBOBOXINFO i = new COMBOBOXINFO(); i.cbSize = Marshal.SizeOf(typeof(COMBOBOXINFO));
+            if (GetComboBoxInfo(c.Handle, ref i) && i.hwndList != IntPtr.Zero) SetWindowTheme(i.hwndList, "DarkMode_Explorer", null);
+        }
+        catch { }
+    }
 
     public static void BlitAlpha(Graphics g, Bitmap bmp)
     {
@@ -154,22 +253,406 @@ static class Native
     }
 }
 
-class Card : Panel
+// Anything children paint over (a tile): draws its own background under a child at "child" (its bounds).
+interface IBack { void PaintBack(Graphics g, Rectangle child); }
+
+class Card : Panel, IBack
 {
     public int Shift = 10;
+    public static float K = 1;        // screen scale (the main window sets it)
+    public float Radius = 0;          // 0: the usual 14 (scaled)
+    public Color Glow = Color.Empty;  // a soft glow in the top right corner
     public Card() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true); }
     protected override void OnControlAdded(ControlEventArgs e) { base.OnControlAdded(e); e.Control.Top += Shift; }
     protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); Invalidate(); }
+    float Rad { get { return Radius > 0 ? Radius : 14 * K; } }
+    public bool Hover;   // lights up under the mouse (the main window's tiles)
+    void Body(Graphics g)
+    {
+        RectangleF r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
+        if (r.Width < 2 || r.Height < 2) return;
+        float h = Hover ? Anim.Get(this, 0, 0) : 0;
+        Theme.FillRound(g, h > 0 ? Theme.Blend(Theme.Card, Theme.Input, 0.45 * h) : Theme.Card, Color.Empty, r, Rad, 0);
+        if (!Glow.IsEmpty)
+            using (GraphicsPath clip = Theme.Round(r, Rad))
+            {
+                GraphicsState st = g.Save();
+                g.SetClip(clip, CombineMode.Intersect);
+                float d = 200 * K;
+                Theme.GlowAt(g, Glow, new RectangleF(Width - 36 * K - d / 2, 30 * K - d / 2, d, d), (int)(100 + 55 * h));
+                g.Restore(st);
+            }
+        Color edge = h <= 0 ? Theme.Stroke : Theme.Blend(Theme.Stroke, Glow.IsEmpty ? Theme.StrokeStrong : Theme.Blend(Theme.StrokeStrong, Glow, 0.5), h);
+        Theme.FillRound(g, Color.Empty, edge, r, Rad, 1);
+    }
+    public void PaintBack(Graphics g, Rectangle child)
+    {
+        g.Clear(Hover ? Theme.Blend(Theme.Card, Theme.Input, 0.45 * Anim.Get(this, 0, 0)) : Theme.Card);
+        GraphicsState st = g.Save();
+        g.TranslateTransform(-child.X, -child.Y);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        Body(g);
+        g.Restore(st);
+    }
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics g = e.Graphics;
-        g.Clear(Parent != null ? Parent.BackColor : Theme.Window);
+        Theme.ParentBack(g, this);
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        Theme.FillRound(g, Theme.Card, Theme.Stroke, new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), 8, 1);
+        Body(g);
         if (Text.Length > 0)
+            TextRenderer.DrawText(g, Text, Theme.CardTitle, new Rectangle((int)(18 * K), (int)(12 * K), Width - (int)(36 * K), (int)(28 * K)), Theme.Text, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter);
+    }
+}
+
+// The window background: the scheme's colour with two soft glows.
+class GlowPanel : Panel
+{
+    public GlowPanel() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true); }
+    Point scrolled;
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        Theme.PaintGlow(e.Graphics, this);
+        if (AutoScrollPosition != scrolled)
+        {   // moved without OnScroll: the copied pixels carry the glow from the old place
+            scrolled = AutoScrollPosition;
+            if (IsHandleCreated) BeginInvoke((MethodInvoker)delegate { Invalidate(true); });
+        }
+    }
+    public Func<Point, bool> Through;   // true: the window below handles the mouse here (moving / sizing the window)
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == 0x84 && Through != null)   // WM_NCHITTEST
         {
-            Theme.FillRound(g, Theme.Accent, Color.Empty, new RectangleF(14, 10, 3.5f, 17), 1.75f, 0);
-            TextRenderer.DrawText(g, Text, Theme.CardTitle, new Rectangle(24, 7, Width - 38, 24), Theme.Text, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter);
+            long lp = m.LParam.ToInt64();
+            Point p = PointToClient(new Point(unchecked((short)(lp & 0xFFFF)), unchecked((short)((lp >> 16) & 0xFFFF))));
+            if (Through(p)) { m.Result = (IntPtr)(-1); return; }   // HTTRANSPARENT
+        }
+        base.WndProc(ref m);
+    }
+    protected override void OnScroll(ScrollEventArgs se) { base.OnScroll(se); Invalidate(true); }
+    protected override void OnMouseWheel(MouseEventArgs e) { base.OnMouseWheel(e); Invalidate(true); }
+}
+
+// Smooth transitions: each control has a few 0..1 values (slot 0 hover, slot 1 on/off) that glide to their target;
+// painting reads them. One timer drives all of them and stops when nothing moves.
+static class Anim
+{
+    class Item { public float[] V = new float[2], T = new float[2]; public bool[] Has = new bool[2]; public bool Deep; }
+    static readonly Dictionary<Control, Item> items = new Dictionary<Control, Item>();
+    static readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
+    static readonly Stopwatch clock = Stopwatch.StartNew();
+    static long last;
+    public static float Ms = 160;   // a full 0 -> 1 change
+    static Anim() { timer.Interval = 15; timer.Tick += Tick; }
+    static Item Of(Control c)
+    {
+        Item it;
+        if (!items.TryGetValue(c, out it)) { it = new Item(); items[c] = it; c.Disposed += delegate { items.Remove(c); }; }
+        return it;
+    }
+    // The value now (eased); a control seen for the first time starts at "start".
+    public static float Get(Control c, int slot, float start)
+    {
+        Item it = Of(c);
+        if (!it.Has[slot]) { it.Has[slot] = true; it.V[slot] = it.T[slot] = start; }
+        float v = it.V[slot];
+        return v * v * (3 - 2 * v);
+    }
+    // Glide to target. deep: the control's children are drawn again too (a tile and what is on it).
+    public static void To(Control c, int slot, float target, bool deep = false)
+    {
+        Item it = Of(c);
+        if (!it.Has[slot]) { it.Has[slot] = true; it.V[slot] = it.T[slot] = target; c.Invalidate(deep); return; }
+        if (it.T[slot] == target) return;
+        it.T[slot] = target; it.Deep |= deep;
+        if (!c.IsHandleCreated || !c.Visible) { it.V[slot] = target; c.Invalidate(deep); return; }   // nothing to watch: jump
+        if (!timer.Enabled) { last = clock.ElapsedMilliseconds; timer.Start(); }
+    }
+    static void Tick(object s, EventArgs e)
+    {
+        long now = clock.ElapsedMilliseconds;
+        float step = Math.Max(0.02f, Math.Min(0.5f, (now - last) / Ms));
+        last = now;
+        bool any = false;
+        foreach (KeyValuePair<Control, Item> kv in items.ToList())
+        {
+            Item it = kv.Value; bool moved = false;
+            for (int i = 0; i < it.V.Length; i++)
+                if (it.Has[i] && it.V[i] != it.T[i])
+                {
+                    float d = it.T[i] - it.V[i];
+                    it.V[i] = Math.Abs(d) <= step ? it.T[i] : it.V[i] + Math.Sign(d) * step;
+                    moved = true;
+                }
+            if (!moved) continue;
+            any = true;
+            if (!kv.Key.IsDisposed) kv.Key.Invalidate(it.Deep);
+        }
+        if (!any) timer.Stop();
+    }
+}
+
+// The picture faded out when the colours change: never takes the focus or the mouse.
+class FadeForm : Form
+{
+    public FadeForm() { SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true); }
+    protected override bool ShowWithoutActivation { get { return true; } }
+    protected override CreateParams CreateParams
+    {
+        get { CreateParams p = base.CreateParams; p.ExStyle |= 0x08000000 | 0x80 | 0x20; return p; }   // no activate, tool window, mouse goes through
+    }
+}
+
+// Menus: rounded highlight, and they fade in.
+class MenuLook : ToolStripProfessionalRenderer
+{
+    public MenuLook() : base(new MenuColors()) { RoundedEdges = false; }
+    protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
+    {
+        if (!e.Item.Selected || !e.Item.Enabled) return;
+        Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+        float K = Card.K;
+        Theme.FillRound(g, Theme.ControlHover, Color.Empty, new RectangleF(4 * K, 1, e.Item.Width - 8 * K, e.Item.Height - 2), 6 * K, 0);
+    }
+    protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+    {
+        e.TextColor = e.Item.Enabled ? Theme.Text : Theme.Disabled;
+        base.OnRenderItemText(e);
+    }
+}
+
+// "+ Add emulator fork" in the free part of the last row of emulator cards: a dashed outline, a round plus, the words.
+class AddTile : Control
+{
+    public float Radius = 20;
+    public AddTile()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        SetStyle(ControlStyles.Selectable, false);
+        Cursor = Cursors.Hand; Text = "Add emulator fork";
+    }
+    protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); Anim.To(this, 0, 1); }
+    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); Anim.To(this, 0, 0); }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        Theme.ParentBack(g, this);
+        if (Width < 20 || Height < 20) return;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        float K = Card.K, h = Anim.Get(this, 0, 0);
+        RectangleF r = new RectangleF(1, 1, Width - 2.5f, Height - 2.5f);
+        Theme.FillRound(g, Color.FromArgb((int)(70 + 90 * h), Theme.Card), Color.Empty, r, Radius, 0);
+        using (GraphicsPath p = Theme.Round(r, Radius))
+        using (Pen pen = new Pen(Theme.Blend(Theme.StrokeStrong, Theme.Accent, 0.55 * h), 1.6f * K))
+        { pen.DashPattern = new[] { 4f, 3f }; g.DrawPath(pen, p); }
+        // a round plus in the accent, the words under it
+        int lh = TextRenderer.MeasureText("Ag", Theme.Title).Height;
+        float d = 46 * K, top = (Height - d - 10 * K - lh) / 2f;
+        RectangleF c = new RectangleF((Width - d) / 2f, top, d, d);
+        using (GraphicsPath cp = new GraphicsPath())
+        {
+            cp.AddEllipse(c);
+            using (LinearGradientBrush b = Theme.AccentBrush(c, 0.10 * h)) g.FillPath(b, cp);
+        }
+        using (Pen plus = new Pen(Theme.AccentText, 2.6f * K))
+        {
+            plus.StartCap = plus.EndCap = LineCap.Round;
+            float m = d * 0.27f, cx = c.X + d / 2, cy = c.Y + d / 2;
+            g.DrawLine(plus, cx - m, cy, cx + m, cy); g.DrawLine(plus, cx, cy - m, cx, cy + m);
+        }
+        TextRenderer.DrawText(g, Text, Theme.Title, new Rectangle(0, (int)(c.Bottom + 10 * K), Width, lh), Theme.Blend(Theme.Muted, Theme.Text, 0.4 + 0.6 * h),
+                              TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
+    }
+}
+
+// A control the mouse goes through (the title and logo: dragging them moves the window).
+class HitThrough : NativeWindow
+{
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == 0x84) { m.Result = (IntPtr)(-1); return; }   // WM_NCHITTEST -> HTTRANSPARENT
+        base.WndProc(ref m);
+    }
+}
+
+// Minimize / maximize / close, drawn like Windows' own, for the window without a title bar.
+class CaptionButton : Control
+{
+    public int Kind;   // 0 minimize, 1 maximize / restore, 2 close
+    bool hot, down;
+    public CaptionButton() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true); SetStyle(ControlStyles.Selectable, false); TabStop = false; }
+    protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hot = true; Anim.To(this, 0, 1); }
+    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hot = down = false; Anim.To(this, 0, 0); }
+    protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); if (e.Button == MouseButtons.Left) { down = true; Invalidate(); } }
+    protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); down = false; Invalidate(); }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        Theme.ParentBack(g, this);
+        Color glyph = Theme.Text;
+        float h = Anim.Get(this, 0, 0);
+        if (h > 0 && Kind == 2)
+        {
+            Color red = down ? Color.FromArgb(0x94, 0x1f, 0x15) : Color.FromArgb(0xc4, 0x2b, 0x1c);
+            using (SolidBrush b = new SolidBrush(Color.FromArgb((int)(255 * h), red))) g.FillRectangle(b, ClientRectangle);
+            glyph = Theme.Blend(Theme.Text, Color.White, h);
+        }
+        else if (h > 0) using (SolidBrush b = new SolidBrush(Color.FromArgb((int)((down ? 0x12 : 0x1c) * h), 255, 255, 255))) g.FillRectangle(b, ClientRectangle);
+        Form f = FindForm();
+        bool max = f != null && f.WindowState == FormWindowState.Maximized;
+        string t = Kind == 0 ? "\uE921" : Kind == 1 ? (max ? "\uE923" : "\uE922") : "\uE8BB";
+        TextRenderer.DrawText(g, t, Theme.Glyph, ClientRectangle, glyph, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
+    }
+}
+
+// A form that doesn't take the focus when it opens for a screenshot (--demo).
+class QuietForm : Form
+{
+    protected override bool ShowWithoutActivation { get { return EmuForm.Demo != null; } }
+}
+
+// A small rounded label: a coloured dot and the text (ForeColor), like "Up to date".
+class StatusChip : Label
+{
+    public StatusChip() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true); }
+    public int Needed(int h) { return TextRenderer.MeasureText(Text, Font, new Size(4000, h), TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width + (int)(h * 0.42f + h * 0.28f + 5) + (int)(h * 0.5f); }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        Theme.ParentBack(g, this);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        RectangleF r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
+        if (r.Width < 4) return;
+        int one = (int)Math.Round(26 * Card.K);   // the height of a one-line chip
+        int lh = Math.Min(Height, one);
+        Theme.FillRound(g, Theme.Input, Theme.Stroke, r, lh / 2f, 1);
+        float d = lh * 0.28f, x = lh * 0.42f;
+        using (SolidBrush b = new SolidBrush(ForeColor)) g.FillEllipse(b, x, (lh - d) / 2f, d, d);
+        int tx = (int)(x + d + 5), tw = Width - tx - (int)(lh * 0.36f);
+        if (Height <= one + 2)
+            TextRenderer.DrawText(g, Text, Font, new Rectangle(tx, 0, tw, Height), ForeColor,
+                                  TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+        else
+        {
+            int line = TextRenderer.MeasureText("Ag", Font).Height, pad = Math.Max(0, (lh - line) / 2);
+            TextRenderer.DrawText(g, Text, Font, new Rectangle(tx, pad, tw, Height - 2 * pad), ForeColor,
+                                  TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
+        }
+    }
+}
+
+// A rounded square in the tile's colour with the emulator's logo (or its initials when it has none).
+class Badge : Control
+{
+    public Color Tone = Color.Empty;
+    Image picture; Bitmap scaled;   // scaled: the logo at the size it is drawn (made once)
+    public Image Picture
+    {
+        get { return picture; }
+        set { picture = value; if (scaled != null) { scaled.Dispose(); scaled = null; } Invalidate(); }
+    }
+    public Badge() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true); }
+    protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); Invalidate(); }
+    protected override void Dispose(bool disposing) { if (disposing && scaled != null) { scaled.Dispose(); scaled = null; } base.Dispose(disposing); }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        Theme.ParentBack(g, this);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        Color t = Tone.IsEmpty ? Theme.Accent : Tone;
+        Theme.FillRound(g, Theme.Blend(Theme.Card, t, 0.40), Color.Empty, new RectangleF(0, 0, Width - 1, Height - 1), Height * 0.29f, 0);
+        if (picture != null && Height > 8)
+        {
+            int pad = Math.Max(2, Height / 9), size = Height - 2 * pad;
+            if (scaled == null || scaled.Width != size) { if (scaled != null) scaled.Dispose(); scaled = EmuForm.Smooth(picture, size); }
+            g.DrawImage(scaled, new Rectangle(pad, pad, size, size), 0, 0, size, size, GraphicsUnit.Pixel);
+        }
+        else TextRenderer.DrawText(g, Text, Theme.Title, ClientRectangle, Theme.Text, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+    }
+}
+
+// Small round badges, overlapping: who uses these saves (logo, or initials when there is none).
+class Avatars : Control
+{
+    public List<Tuple<string, Color, Image>> People = new List<Tuple<string, Color, Image>>();
+    public Avatars() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true); }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        Theme.ParentBack(g, this);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        float d = Height - 3, x = 1.5f;
+        g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        foreach (var p in People)
+        {
+            using (SolidBrush b = new SolidBrush(Theme.Blend(Theme.Card, p.Item2.IsEmpty ? Theme.Accent : p.Item2, 0.5))) g.FillEllipse(b, x, 1.5f, d, d);
+            if (p.Item3 != null)
+            {
+                float inset = d * 0.16f;
+                try { g.DrawImage(p.Item3, new RectangleF(x + inset, 1.5f + inset, d - 2 * inset, d - 2 * inset)); } catch { }   // a picture just replaced: drawn next time
+            }
+            else TextRenderer.DrawText(g, p.Item1, Theme.Caption, new Rectangle((int)x, 1, (int)d + 1, (int)d + 1), Theme.Text, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+            using (Pen pen = new Pen(Theme.Card, 2.2f)) g.DrawEllipse(pen, x, 1.5f, d, d);
+            x += d * 0.74f;
+        }
+    }
+}
+
+// A ring split into parts (sizes), the total in the middle, and a legend beside it.
+class Ring : Control
+{
+    public List<Tuple<string, long, Color>> Parts = new List<Tuple<string, long, Color>>();
+    public string Center = "";
+    public Ring() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true); }
+    public static string Bytes(long b) { return b >= (1L << 30) ? (b / 1073741824.0).ToString(b >= (10L << 30) ? "0" : "0.0") + " GB" : b >= (1L << 20) ? (b >> 20) + " MB" : b > 0 ? "<1 MB" : "0 MB"; }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        Theme.ParentBack(g, this);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        float K = Card.K, d = Height - 4, th = d * 0.15f;
+        RectangleF r = new RectangleF(2 + th / 2, 2 + th / 2, d - th, d - th);
+        using (Pen bg = new Pen(Theme.Input, th)) g.DrawEllipse(bg, r);
+        long total = Parts.Sum(p => p.Item2);
+        float a = -90;
+        if (total > 0)
+            foreach (var p in Parts)
+            {
+                float sweep = 360f * p.Item2 / total;
+                if (sweep >= 0.5f) using (Pen pen = new Pen(p.Item3, th)) g.DrawArc(pen, r, a, Math.Max(0.8f, sweep - (Parts.Count > 1 ? 2f : 0)));
+                a += sweep;
+            }
+        TextRenderer.DrawText(g, Center, Theme.Title, new Rectangle(2, 2, (int)d, (int)d), Theme.Text, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+        int row = (int)(22 * K), lx = (int)(d + 18 * K), ly = (int)((Height - Parts.Count * row) / 2f);
+        foreach (var p in Parts)
+        {
+            using (SolidBrush b = new SolidBrush(p.Item3)) Theme.FillRound(g, p.Item3, Color.Empty, new RectangleF(lx, ly + (row - 9 * K) / 2f, 9 * K, 9 * K), 2.5f * K, 0);
+            TextRenderer.DrawText(g, p.Item1 + "  " + Bytes(p.Item2), Theme.Small, new Rectangle(lx + (int)(15 * K), ly, Width - lx - (int)(15 * K), row), Theme.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            ly += row;
+        }
+    }
+}
+
+// Seven bars (one per day), drawn with the accent gradient.
+class Bars : Control
+{
+    public int[] Values = new int[7];
+    public Bars() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true); }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        Theme.ParentBack(g, this);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        int n = Values.Length, max = Math.Max(1, Values.Max());
+        float gap = 6 * Card.K, bw = (Width - gap * (n - 1)) / n;
+        for (int i = 0; i < n; i++)
+        {
+            float h = Math.Max(4, (Height - 2) * Values[i] / (float)max), x = i * (bw + gap);
+            RectangleF r = new RectangleF(x, Height - h, bw, h);
+            using (LinearGradientBrush b = new LinearGradientBrush(new RectangleF(x, 0, bw, Height + 1), Theme.Accent, Theme.Blend(Theme.Card, Theme.Accent2, 0.35), 90f))
+            using (GraphicsPath p = Theme.Round(r, Math.Min(4 * Card.K, bw / 2)))
+                g.FillPath(b, p);
         }
     }
 }
@@ -182,10 +665,10 @@ class FlatBar : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics g = e.Graphics;
-        g.Clear(Parent != null ? Parent.BackColor : Theme.Card);
+        Theme.ParentBack(g, this);
         g.SmoothingMode = SmoothingMode.AntiAlias;
         float h = Math.Min(6, Height), y = (Height - h) / 2f;
-        Theme.FillRound(g, Theme.Dark ? Color.FromArgb(255, 0x45, 0x45, 0x45) : Color.FromArgb(255, 0xdd, 0xdd, 0xdd), Color.Empty, new RectangleF(0, y, Width - 1, h), h / 2, 0);
+        Theme.FillRound(g, Theme.Input, Color.Empty, new RectangleF(0, y, Width - 1, h), h / 2, 0);
         float w = (Width - 1) * (float)val / max;
         if (w >= 1) Theme.FillRound(g, Theme.Accent, Color.Empty, new RectangleF(0, y, Math.Max(w, h), h), h / 2, 0);
     }
@@ -212,7 +695,7 @@ class DiscordTag : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics g = e.Graphics;
-        g.Clear(Parent != null ? Parent.BackColor : Theme.Window);
+        Theme.ParentBack(g, this);
         g.SmoothingMode = SmoothingMode.AntiAlias;
         float s = Math.Min(Height, Width) * 0.72f, y0 = (Height - s) / 2f;
         using (GraphicsPath p = (GraphicsPath)Logo().Clone())
@@ -278,12 +761,74 @@ class DiscordTag : Control
     }
 }
 
+// One colour scheme in the Colors window: a small preview in its own colours, its name, and a ring when chosen.
+class Swatch : Control
+{
+    public string[] Scheme;
+    public Swatch() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true); Cursor = Cursors.Hand; }
+    protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); Anim.To(this, 0, 1); }
+    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); Anim.To(this, 0, 0); }
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.KeyCode == Keys.Space) { e.Handled = true; OnClick(EventArgs.Empty); }   // Enter stays with Done
+    }
+    protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+    protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+    protected override void OnChangeUICues(UICuesEventArgs e) { base.OnChangeUICues(e); Invalidate(); }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        Theme.ParentBack(g, this);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        float K = Card.K;
+        Color bg = Theme.Hex(Scheme[2]), tile = Theme.Hex(Scheme[3]), line = Theme.Hex(Scheme[5]), text = Theme.Hex(Scheme[6]),
+              acc = Theme.Hex(Scheme[8]), acc2 = Theme.Hex(Scheme[9]), glow = Theme.Hex(Scheme[10]);
+        bool on = Scheme[0] == Theme.Scheme;
+        float hot = Anim.Get(this, 0, 0);
+        RectangleF r = new RectangleF(1.5f, 1.5f, Width - 3.5f, Height - 3.5f);
+        Theme.FillRound(g, bg, Color.Empty, r, 14 * K, 0);
+        using (GraphicsPath clip = Theme.Round(r, 14 * K))
+        {
+            GraphicsState st = g.Save(); g.SetClip(clip, CombineMode.Intersect);
+            Theme.GlowAt(g, glow, new RectangleF(Width * 0.35f, -Height * 0.6f, Width * 1.1f, Height * 1.2f), 230);
+            g.Restore(st);
+        }
+        // a little tile with a Launch button
+        RectangleF t = new RectangleF(12 * K, 12 * K, Width - 24 * K, Height - 52 * K);
+        Theme.FillRound(g, tile, line, t, 10 * K, 1);
+        RectangleF pill = new RectangleF(t.X + 10 * K, t.Bottom - 22 * K, t.Width * 0.58f, 13 * K);
+        using (GraphicsPath pp = Theme.Round(pill, pill.Height / 2))
+        using (LinearGradientBrush b = new LinearGradientBrush(new RectangleF(pill.X - 1, pill.Y - 1, pill.Width + 2, pill.Height + 2), acc, acc2, 30f))
+            g.FillPath(b, pp);
+        using (SolidBrush b = new SolidBrush(Theme.Blend(tile, acc, 0.45))) g.FillEllipse(b, t.X + 10 * K, t.Y + 10 * K, 14 * K, 14 * K);
+        using (SolidBrush b = new SolidBrush(Theme.Blend(tile, text, 0.55))) g.FillRectangle(b, t.X + 30 * K, t.Y + 13 * K, t.Width * 0.38f, 3 * K);
+        using (SolidBrush b = new SolidBrush(Theme.Blend(tile, text, 0.30))) g.FillRectangle(b, t.X + 30 * K, t.Y + 20 * K, t.Width * 0.25f, 3 * K);
+        TextRenderer.DrawText(g, Scheme[1], Theme.Strong, new Rectangle((int)(14 * K), Height - (int)(38 * K), Width - (int)(28 * K), (int)(30 * K)), text,
+                              TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+        if (on)
+        {   // a tick in the corner
+            float d = 18 * K; RectangleF c = new RectangleF(Width - 14 * K - d, Height - 14 * K - d - 2 * K, d, d);
+            using (GraphicsPath cp = new GraphicsPath()) { cp.AddEllipse(c); using (LinearGradientBrush b = new LinearGradientBrush(c, acc, acc2, 30f)) g.FillPath(b, cp); }
+            using (Pen pen = new Pen(Theme.Hex(Scheme[12]), 1.8f * K)) { pen.StartCap = pen.EndCap = LineCap.Round; g.DrawLines(pen, new[] { new PointF(c.X + d * 0.27f, c.Y + d * 0.52f), new PointF(c.X + d * 0.44f, c.Y + d * 0.68f), new PointF(c.X + d * 0.74f, c.Y + d * 0.34f) }); }
+        }
+        Color edge = on ? acc : Theme.Blend(line, Theme.Blend(line, text, 0.35), hot);
+        Theme.FillRound(g, Color.Empty, edge, r, 14 * K, on ? 2.2f * K : 1);
+        if (Focused && ShowFocusCues)   // the keyboard is on this one (only shown when using the keyboard)
+            Theme.FillRound(g, Color.Empty, Theme.Blend(line, text, 0.8), new RectangleF(r.X + 4 * K, r.Y + 4 * K, r.Width - 8 * K, r.Height - 8 * K), 11 * K, 1.4f * K);
+    }
+}
+
 // One emulator's card on the Builds page.
 class EmuCard
 {
     public EmuDef Def;
     public Card Box = new Card();
-    public Label Note = new Label(), State = new Label(), Data = new Label(), Ver = new Label();   // Ver: installed version, on the title row
+    public Label Note = new Label(), State = new StatusChip(), Data = new Label(), Ver = new Label();   // State: the status chip; Ver: "Version ..."
+    public Label Title = new Label();
+    public Badge Badge = new Badge();
+    public bool ChipTop;          // the status chip sits in the top right corner (else on a line of its own)
+    public bool Joined;           // uses the shared data (or is the one everyone uses)
     // Launch when installed; Install when not; next to Launch, a greyed "Up to date" that becomes "Update" when a newer version is out. "..." holds the rest.
     public Button Update = new Button(), Launch = new Button(), More = new Button();
     public LinkLabel Existing = new LinkLabel(), Next = new LinkLabel();   // "I already have it" / "Next: add your keys..."
@@ -315,7 +860,7 @@ class EmuForm : Form
     // One window: a header (logo, title, Add emulator, "..." menu), the games folder line, one card per emulator and a
     // status line at the bottom. The log opens in its own window. Text rules: plain words, only what the user needs;
     // details (versions, paths, reasons) go to the log.
-    readonly Panel buildsPage = new Panel(), cardsHost = new Panel();
+    readonly Panel buildsPage = new GlowPanel(), cardsHost = new GlowPanel();
     readonly Label head = new Label(), footer = new Label();
     readonly PictureBox logoBox = new PictureBox();
     readonly DiscordTag credit = new DiscordTag();   // "made by" on Discord, next to the title
@@ -337,19 +882,42 @@ class EmuForm : Form
     bool IsBusy { get { return anyBusy || identifying > 0 || asking > 0; } }
     void PleaseWait() { Tell(APP, "Please wait for the current task to finish."); }
     readonly Card gamesCard = new Card();
-    readonly Label gamesLbl = new Label();
+    readonly Label gamesLbl = new Label(), gamesCap = new Label();
     readonly Button gamesPick = new Button();
+    // the small tiles under the emulators: saves, storage, updates, manager (the games folder tile is gamesCard)
+    readonly Card savesTile = new Card(), storeTile = new Card(), updTile = new Card(), mgrTile = new Card();
+    readonly Label savesCap = new Label(), savesBig = new Label(), savesUnit = new Label(), savesLine = new Label();
+    readonly LinkLabel savesLink = new LinkLabel();
+    readonly Avatars savesWho = new Avatars();
+    readonly Label storeCap = new Label();
+    readonly Ring storeRing = new Ring();
+    readonly Label updCap = new Label(), updText = new Label(), updWhen = new Label(), updLine = new Label();
+    readonly Bars updBars = new Bars();
+    readonly Label mgrCap = new Label(), mgrText = new Label();
+    readonly StatusChip mgrChip = new StatusChip();
+    static readonly Dictionary<Control, string> fontRoles = new Dictionary<Control, string>();   // caption / big / value / name / small / large / strong
+    static readonly HashSet<Control> toggles = new HashSet<Control>();   // check boxes drawn as on/off switches
+    DateTime checkedAt = DateTime.MinValue;   // last update check that finished
+    bool checking, mgrChecked, layoutQueued;
+    Size laidOut;
+    readonly System.Windows.Forms.Timer clock = new System.Windows.Forms.Timer();
+    // no title bar: the header is the top of the window; these are its minimize / maximize / close buttons
+    readonly CaptionButton winMin = new CaptionButton(), winMax = new CaptionButton(), winClose = new CaptionButton();
+    readonly List<HitThrough> through = new List<HitThrough>();
+    int headerBottom;
+    readonly System.Windows.Forms.Timer hoverClock = new System.Windows.Forms.Timer();
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Point p);
     const string APP = "NS2 Emulator Manager";
 
     void GamesText()
     {
         string g = Core.Cfg.GamesFolder;
         bool set = !string.IsNullOrEmpty(g);
-        gamesLbl.Text = !set ? "Choose the folder with your games." : "Games: " + g + (Directory.Exists(g) ? "" : "   (not found)");
+        gamesLbl.Text = !set ? "Choose the folder with your games." : g + (Directory.Exists(g) ? "" : "   (not found)");
         roles[gamesLbl] = set && Directory.Exists(g) ? "text" : "info";
         gamesLbl.ForeColor = RoleColor(gamesLbl);
         gamesPick.Text = set ? "Change..." : "Choose...";
-        if (set) accents.Remove(gamesPick); else accents[gamesPick] = Theme.Accent;
+        if (set) accents.Remove(gamesPick); else Outline(gamesPick, Theme.Accent);
         gamesPick.Invalidate();
     }
 
@@ -600,6 +1168,7 @@ class EmuForm : Form
     int D(int v) { return (int)Math.Round(v * k); }
     // shown instead of cards until the user adds one
     readonly Card emptyCard = new Card();
+    readonly AddTile addTile = new AddTile();   // fills the free part of the last row of emulator cards
     readonly Label emptyText = new Label();
     readonly Button emptyRec = new Button();
     readonly LinkLabel emptyFork = new LinkLabel();
@@ -631,41 +1200,98 @@ class EmuForm : Form
     public EmuForm()
     {
         Text = APP + (Core.Cfg.Sandbox && Demo == null ? "  -  TEST" : "");   // --demo: screenshots, without the test label
-        try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+        Icon = AppIcon();
         Font = new Font("Segoe UI", 9.5f);
         AutoScaleMode = AutoScaleMode.None;   // DoLayout scales by the screen DPI itself
         using (Graphics g = CreateGraphics()) k = Math.Max(1f, g.DpiX / 96f);
-        ClientSize = new Size(D(800), D(720));
+        Card.K = k;
+        ClientSize = new Size(D(1040), D(780));
         MinimumSize = new Size(D(480), D(420));
         StartPosition = FormStartPosition.CenterScreen;
         RestoreWindow();
+        if (Demo != null && Environment.GetEnvironmentVariable("NS2_DEMO_OFFSCREEN") == "1") { StartPosition = FormStartPosition.Manual; Location = new Point(-30000, -30000); }
         DoubleBuffered = true;
 
         Controls.Add(buildsPage);
         // header
-        try { using (Stream s = typeof(EmuForm).Assembly.GetManifestResourceStream("app.png")) if (s != null) logoBox.Image = new Bitmap(s); } catch { }
-        logoBox.SizeMode = PictureBoxSizeMode.Zoom;
+        try { using (Stream s = typeof(EmuForm).Assembly.GetManifestResourceStream("app.png")) if (s != null) using (Bitmap b = new Bitmap(s)) logoBox.Image = Smooth(b, D(56)); } catch { }
+        try
+        {   // screenshots of other logos (test environment only)
+            string lf = Demo != null ? Environment.GetEnvironmentVariable("NS2_DEMO_LOGO") : null;
+            if (!string.IsNullOrEmpty(lf) && File.Exists(lf)) using (Bitmap b = new Bitmap(lf)) logoBox.Image = Smooth(b, D(56));
+        }
+        catch { }
+        logoBox.SizeMode = PictureBoxSizeMode.CenterImage;
         head.Text = Core.Cfg.Sandbox && Demo == null ? APP + " (test)" : APP; head.Font = Theme.Header ?? new Font("Segoe UI Semibold", 16f); head.AutoEllipsis = true;
         addEmu.Text = "Add emulator fork"; addEmu.Click += delegate { ShowRecommended(false); };
         Outline(addEmu, Theme.Accent);
-        menuBtn.Text = "..."; menuBtn.Click += delegate { MainMenu().Show(menuBtn, new Point(0, menuBtn.Height)); };
-        saveBtn.Text = "Save Helper"; saveBtn.Click += delegate { SaveHelper(); };
-        tips.SetToolTip(saveBtn, "Where your saves are, and what happens to them");
+        menuBtn.Text = "···"; menuBtn.Click += delegate { MainMenu().Show(menuBtn, new Point(0, menuBtn.Height)); };
+        saveBtn.Text = "Themes"; saveBtn.Click += delegate { ShowColors(); }; dotted.Add(saveBtn);
+        tips.SetToolTip(saveBtn, "Choose the colours");
         tips.SetToolTip(menuBtn, "More");
         buildsPage.Controls.AddRange(new Control[] { logoBox, head, addEmu, menuBtn, credit, saveBtn });
+        winMin.Kind = 0; winMax.Kind = 1; winClose.Kind = 2;
+        winMin.Click += delegate { WindowState = FormWindowState.Minimized; };
+        winMax.Click += delegate { WindowState = WindowState == FormWindowState.Maximized ? FormWindowState.Normal : FormWindowState.Maximized; };
+        winClose.Click += delegate { Close(); };
+        tips.SetToolTip(winMin, "Minimize"); tips.SetToolTip(winClose, "Close");
+        buildsPage.Controls.AddRange(new Control[] { winMin, winMax, winClose });
+        // the empty part of the header, the title and the logo move the window (double-click: maximize), like a title bar
+        ((GlowPanel)buildsPage).Through = p => p.Y < headerBottom;
+        foreach (Control c in new Control[] { head, logoBox })
+        {
+            Control cc = c;
+            cc.HandleCreated += delegate { HitThrough h = new HitThrough(); h.AssignHandle(cc.Handle); through.Add(h); };
+        }
         tips.SetToolTip(credit, "Made by " + DiscordTag.NAME + " on Discord. Click to copy the name.");
         mgrLink.Visible = false; mgrLink.TextAlign = ContentAlignment.MiddleRight; mgrLink.LinkBehavior = LinkBehavior.HoverUnderline;
         mgrLink.LinkColor = mgrLink.ActiveLinkColor = mgrLink.VisitedLinkColor = Theme.Accent;
         mgrLink.LinkClicked += delegate { UpdateManager(); };
         buildsPage.Controls.Add(mgrLink);
-        // games folder: one line
-        gamesCard.Text = ""; gamesCard.Shift = 0;
-        gamesLbl.AutoEllipsis = true;
-        gamesPick.Click += delegate { PickGames(); };
-        gamesCard.Controls.AddRange(new Control[] { gamesLbl, gamesPick });
-        buildsPage.Controls.Add(gamesCard);
         cardsHost.AutoScroll = true;
         buildsPage.Controls.Add(cardsHost);
+        // the small tiles
+        foreach (Card t in new[] { gamesCard, savesTile, storeTile, updTile, mgrTile }) { t.Text = ""; t.Shift = 0; t.Radius = D(18); t.Hover = true; }
+        gamesCap.Text = "Games folder"; storeCap.Text = "Storage"; updCap.Text = "Updates"; mgrCap.Text = "Manager";
+        foreach (Label l in new[] { gamesCap, savesCap, storeCap, updCap, mgrCap }) { fontRoles[l] = "caption"; roles[l] = "muted"; l.AutoEllipsis = true; }
+        gamesLbl.AutoEllipsis = true; fontRoles[gamesLbl] = "large";
+        gamesPick.Click += delegate { PickGames(); };
+        gamesCard.Controls.AddRange(new Control[] { gamesCap, gamesLbl, gamesPick });
+        savesLink.Text = "Save Helper ›"; savesLink.LinkClicked += delegate { SaveHelper(); }; savesLink.TextAlign = ContentAlignment.MiddleRight;
+        fontRoles[savesBig] = "big"; fontRoles[savesUnit] = "value"; roles[savesUnit] = "muted"; roles[savesLine] = "muted"; savesLine.AutoEllipsis = true;
+        savesTile.Controls.AddRange(new Control[] { savesCap, savesLink, savesBig, savesUnit, savesLine, savesWho });
+        storeTile.Controls.AddRange(new Control[] { storeCap, storeRing });
+        fontRoles[updText] = "value"; updText.AutoEllipsis = true; roles[updWhen] = "muted"; roles[updLine] = "muted"; updLine.AutoEllipsis = true; updWhen.AutoEllipsis = true;
+        updTile.Controls.AddRange(new Control[] { updCap, updText, updWhen, updBars, updLine });
+        fontRoles[mgrText] = "value"; mgrText.AutoEllipsis = true; fontRoles[mgrChip] = "small";
+        mgrChip.Click += delegate { if (mgrRel != null) UpdateManager(); };
+        mgrTile.Controls.AddRange(new Control[] { mgrCap, mgrText, mgrChip });
+        cardsHost.Controls.AddRange(new Control[] { savesTile, storeTile, updTile, gamesCard, mgrTile });
+        clock.Interval = 30000; clock.Tick += delegate { if (WindowState != FormWindowState.Minimized) InfoText(); };
+        clock.Start();
+        // which tile is under the mouse (MouseEnter/Leave can't tell: a tile's own buttons take the mouse)
+        hoverClock.Interval = 50;
+        hoverClock.Tick += delegate
+        {
+            if (WindowState == FormWindowState.Minimized) return;
+            Point mp = Control.MousePosition;
+            Control under = null;
+            try { under = Control.FromChildHandle(WindowFromPoint(mp)); } catch { }
+            Control hit = under;
+            while (hit != null && hit.Parent != cardsHost) hit = hit.Parent;   // the tile the pointer is over (null: none)
+            foreach (Control c in cardsHost.Controls)
+            {
+                Card t = c as Card;
+                if (t == null || !t.Hover) continue;
+                Anim.To(t, 0, t.Visible && hit == t ? 1 : 0, true);
+            }
+        };
+        hoverClock.Start();
+        emptyCard.Shift = 0; emptyCard.Radius = D(18);
+        addTile.Radius = D(20); addTile.Visible = false;
+        addTile.Click += delegate { ShowRecommended(false); };
+        tips.SetToolTip(addTile, "Add another emulator, from the list or from a link");
+        cardsHost.Controls.Add(addTile);
         emptyCard.Text = "No emulators yet";
         emptyText.Text = "Choose one to install.";
         emptyText.ForeColor = Color.DimGray;
@@ -694,11 +1320,14 @@ class EmuForm : Form
         DoLayout();
         Resize += delegate { DoLayout(); };
         // back from Explorer (keys copied in...): every card re-checks; a postponed question is asked now
-        Activated += delegate { activatedAt = DateTime.Now; if (!IsBusy) RefreshAll(); if (dupRetry && !IsBusy) BeginInvoke((MethodInvoker)AskDuplicates); if ((joinPending || joinWhy.Count > 0) && !IsBusy) { joinPending = false; joinWhy.Clear(); JoinSharing(null); } };
+        Activated += delegate { activatedAt = DateTime.Now; if (!IsBusy) { RefreshAll(); ScanInfo(); } if (dupRetry && !IsBusy) BeginInvoke((MethodInvoker)AskDuplicates); if ((joinPending || joinWhy.Count > 0) && !IsBusy) { joinPending = false; joinWhy.Clear(); JoinSharing(null); } };
         // first start: the welcome list (nothing is on the list yet); afterwards the usual update check
         Shown += delegate
         {
             Log("--- NS2 Emulator Manager " + Core.AppVersion + " started (" + Application.ExecutablePath + ")");
+            if (Demo == null) OnScreen();
+            FitHeight();
+            ScanInfo();   // Activated usually started it already
             if (Core.Cfg.Sandbox && Demo != null) { BeginInvoke((MethodInvoker)RunDemo); CheckAll(); return; }
             if (Core.FirstRun) { Core.FirstRun = false; ShowRecommended(true); }
             CheckAll();
@@ -767,7 +1396,9 @@ class EmuForm : Form
         else if ((n == "versions" || n == "versionsopen") && c != null) ChooseVersion(c);
         else if (n == "share" && c != null) ToggleShare(c);
         else if (n == "saves" || n == "savestall") SaveHelper();
+        else if (n == "colors") ShowColors();
     }
+    protected override bool ShowWithoutActivation { get { return Demo != null; } }
 
     // ---- Save Helper: where this setup's saves are, in plain words, with a button to open each place
     Form saveForm;
@@ -982,7 +1613,10 @@ class EmuForm : Form
     ContextMenuStrip MakeMenu(params object[] items)   // items: "text", Action, ... ; null = separator
     {
         ContextMenuStrip m = new ContextMenuStrip();
-        m.Renderer = new ToolStripProfessionalRenderer(new MenuColors());
+        m.Renderer = new MenuLook();
+        m.Padding = new Padding(0, D(4), 0, D(4));
+        m.HandleCreated += delegate { Native.RoundPopup(m.Handle); };
+        FadeIn(m);
         m.Font = Font; m.ShowImageMargin = false;
         for (int i = 0; i < items.Length; i++)
         {
@@ -996,11 +1630,28 @@ class EmuForm : Form
         return m;
     }
 
+    // A menu fades in over a few frames when it opens.
+    static void FadeIn(ToolStripDropDown m)
+    {
+        System.Windows.Forms.Timer t = new System.Windows.Forms.Timer(); t.Interval = 15;
+        Stopwatch sw = new Stopwatch();
+        m.Opening += delegate { m.Opacity = 0.01; };
+        m.Opened += delegate { sw.Restart(); t.Start(); };
+        t.Tick += delegate
+        {
+            double v = Math.Min(1, sw.ElapsedMilliseconds / 130.0);
+            if (m.IsDisposed) { t.Stop(); t.Dispose(); return; }
+            m.Opacity = 1 - (1 - v) * (1 - v);
+            if (v >= 1) t.Stop();
+        };
+        m.Disposed += delegate { t.Stop(); t.Dispose(); };
+    }
+
     ContextMenuStrip MainMenu()
     {
         List<object> items = IsBusy ? new List<object>() : new List<object> { "Add from link...", (Action)AddFork, "Save Helper", (Action)SaveHelper, null };
         items.AddRange(new object[] {
-            "Check for updates", (Action)delegate { CheckAll(true); }, "Show log", (Action)ShowLog, "Open install folder", (Action)delegate { Explore(Core.Home); } });
+            "Themes...", (Action)ShowColors, "Check for updates", (Action)delegate { CheckAll(true); }, "Show log", (Action)ShowLog, "Open install folder", (Action)delegate { Explore(Core.Home); } });
         if (mgrRel != null && !IsBusy) { items.Insert(0, (Action)UpdateManager); items.Insert(0, "Update the manager to " + mgrVer); }
         if (Core.Cfg.Sandbox) { items.Add(null); items.Add("Reset test"); items.Add((Action)ResetSandbox); }
         ContextMenuStrip m = MakeMenu(items.ToArray());
@@ -1032,6 +1683,8 @@ class EmuForm : Form
             try { Process.Start(u); } catch { }
         });
         items.Add("Edit note"); items.Add((Action)delegate { EditNote(c); });
+        items.Add("Change icon..."); items.Add((Action)delegate { ChangeIcon(c); });
+        if (File.Exists(IconFile(d))) { items.Add("Reset icon"); items.Add((Action)delegate { ResetIcon(c); }); }
         if (free) { items.Add(null); items.Add("Remove from list"); items.Add((Action)delegate { RemoveFork(c); }); }
         return MakeMenu(items.ToArray());
     }
@@ -1055,130 +1708,712 @@ class EmuForm : Form
         if (WindowState == FormWindowState.Minimized) return;
         int cw = ClientSize.Width, ch = ClientSize.Height;
         SuspendLayout();
-        int px = D(20);
-        int pw = Math.Max(D(260), cw - px - D(38));   // page width (room kept for the cards' scroll bar)
-        buildsPage.SetBounds(px, 0, cw - px, ch);
+        int px = D(22);
+        int pw = Math.Max(D(260), cw - 2 * px);   // the tiles' width (the scroll bar fits in the right margin)
+        buildsPage.SetBounds(0, 0, cw, ch);
 
-        // header: logo + title left, Add emulator and "..." right
-        logoBox.SetBounds(0, D(16), D(36), D(36));
-        addEmu.SetBounds(pw - D(226), D(18), D(170), D(34));
-        saveBtn.Visible = pw >= D(600);   // narrow window: it's still in the "..." menu
-        saveBtn.SetBounds(addEmu.Left - D(8) - D(124), D(18), D(124), D(34));
-        menuBtn.SetBounds(pw - D(48), D(18), D(48), D(34));
-        head.SetBounds(D(46), D(16), Math.Max(D(60), (saveBtn.Visible ? saveBtn.Left : addEmu.Left) - D(54)), D(36));
-        {   // credit on its own small line under the title
+        // minimize / maximize / close in the top right corner (there is no title bar)
+        int cbw = D(46), cbh = D(32);
+        winClose.SetBounds(cw - cbw, 0, cbw, cbh); winMax.SetBounds(cw - 2 * cbw, 0, cbw, cbh); winMin.SetBounds(cw - 3 * cbw, 0, cbw, cbh);
+        tips.SetToolTip(winMax, WindowState == FormWindowState.Maximized ? "Restore Down" : "Maximize");
+        winMax.Invalidate();
+        // header under them: logo, title and credit left; Save Helper, Add emulator fork and "..." right
+        int hy = D(30);
+        logoBox.SetBounds(px - D(2), hy - D(6), D(56), D(56));   // the console logo, as wide as it can be
+        int right = px + pw;
+        menuBtn.SetBounds(right - D(48), hy + D(3), D(48), D(38));
+        addEmu.SetBounds(menuBtn.Left - D(10) - D(176), hy + D(3), D(176), D(38));
+        saveBtn.Visible = pw >= D(620);   // narrow window: it's still in the "..." menu
+        saveBtn.SetBounds(addEmu.Left - D(10) - D(124), hy + D(3), D(124), D(38));
+        int hx = px + D(64);
+        head.SetBounds(hx, hy - D(4), Math.Max(D(60), (saveBtn.Visible ? saveBtn.Left : addEmu.Left) - D(12) - hx), D(32));
+        {
             credit.Font = Font; credit.Height = D(20);
             int crw; using (Graphics g = CreateGraphics()) crw = credit.PreferredWidth(g);
-            credit.SetBounds(D(48), D(52), crw, D(20));
+            credit.SetBounds(hx + D(2), hy + D(28), crw, D(20));
             int mw = TextRenderer.MeasureText(mgrLink.Text, Font).Width + D(8);
-            mgrLink.SetBounds(pw - mw, D(56), mw, D(22));
-            credit.BackColor = buildsPage.BackColor; credit.Invalidate();
+            mgrLink.SetBounds(right - mw, hy + D(44), mw, D(20));
         }
-        int y = D(82);
-
-        // games folder: one line
-        gamesLbl.SetBounds(D(16), D(12), pw - D(160), D(26));
-        gamesPick.SetBounds(pw - D(128), D(8), D(112), D(34));
-        gamesCard.SetBounds(0, y, pw, D(50)); gamesCard.Invalidate();
-        y += D(50) + D(12);
+        int top = hy + D(70);
+        headerBottom = top - D(4);
 
         // status line at the bottom
         int fy = ch - D(34);
         int lw = TextRenderer.MeasureText(logLink.Text, Font).Width + D(6), cwid = TextRenderer.MeasureText(checkLink.Text, Font).Width + D(6);
-        logLink.SetBounds(pw - lw, fy, lw, D(22));
-        checkLink.SetBounds(pw - lw - D(14) - cwid, fy, cwid, D(22));
-        footer.SetBounds(0, fy, Math.Max(D(40), pw - lw - cwid - D(30)), D(22));
+        logLink.SetBounds(right - lw, fy, lw, D(22));
+        checkLink.SetBounds(right - lw - D(14) - cwid, fy, cwid, D(22));
+        footer.SetBounds(px, fy, Math.Max(D(40), pw - lw - cwid - D(30)), D(22));
 
-        cardsHost.SetBounds(0, y, pw + D(18), Math.Max(D(60), fy - D(8) - y));
+        cardsHost.SetBounds(0, top, cw, Math.Max(D(60), fy - D(10) - top));
+        int gap = D(14);
+        int cols = pw >= D(960) ? 3 : pw >= D(620) ? 2 : 1;
+        int tw = (pw - gap * (cols - 1)) / cols;
         int cy = cardsHost.AutoScrollPosition.Y;
-        foreach (EmuCard c in cards) cy += LayoutCard(c, cy, pw) + D(12);
+        Color[] tones = { Theme.Accent, Theme.Accent2, Theme.Accent3 };
+        for (int i = 0; i < cards.Count; i++)
+        {
+            EmuCard c = cards[i];
+            Color t = tones[i % tones.Length];
+            if (c.Box.Glow != t) { c.Box.Glow = t; c.Badge.Tone = t; c.Box.Invalidate(true); }
+        }
+        // emulator tiles, a row at a time; a row's tiles share its height (buttons line up at the bottom)
+        int lastY = cy, lastH = 0;
+        for (int i = 0; i < cards.Count; i += cols)
+        {
+            List<EmuCard> row = cards.Skip(i).Take(cols).ToList();
+            int rh = 0;
+            for (int j = 0; j < row.Count; j++) rh = Math.Max(rh, LayoutCard(row[j], px + j * (tw + gap), cy, tw, 0));
+            for (int j = 0; j < row.Count; j++) LayoutCard(row[j], px + j * (tw + gap), cy, tw, rh);
+            lastY = cy; lastH = rh;
+            cy += rh + gap;
+        }
+        // the last row not full (4, 5, 7... emulators in three columns): "+ Add emulator fork" takes the rest of it
+        int inLast = cards.Count % cols;
+        addTile.Visible = cards.Count > 0 && inLast != 0;
+        if (addTile.Visible)
+        {
+            int free = cols - inLast;
+            addTile.SetBounds(px + inLast * (tw + gap), lastY, free * tw + (free - 1) * gap, lastH);
+            addTile.Invalidate();
+        }
         emptyCard.Visible = cards.Count == 0;
         checkLink.Visible = cards.Count > 0;
         if (cards.Count == 0)
         {
-            emptyText.SetBounds(D(24), D(26 + S), pw - D(48), D(24));
-            emptyRec.SetBounds(D(24), D(58 + S), D(170), D(36));
+            int P = D(18);
+            emptyText.SetBounds(P, D(48), pw - 2 * P, D(24));
+            emptyRec.SetBounds(P, D(84), D(176), D(38));
             int fw = TextRenderer.MeasureText(emptyFork.Text, Font).Width + D(6);
-            emptyFork.SetBounds(D(210), D(66 + S), fw, D(22));
-            emptyCard.SetBounds(0, cy, pw, D(116)); emptyCard.Invalidate();
+            emptyFork.SetBounds(P + D(176) + D(16), D(92), fw, D(22));
+            emptyCard.SetBounds(px, cy, pw, D(140)); emptyCard.Invalidate();
+            cy += D(140) + gap;
+        }
+
+        // the small tiles: saves, storage and updates once something is installed; the games folder and the manager always
+        InfoText();
+        bool any = cards.Any(k => Installed(k.Def));
+        savesTile.Visible = storeTile.Visible = updTile.Visible = any;
+        List<KeyValuePair<Card, int>> tiles = new List<KeyValuePair<Card, int>>();
+        Action<Card, int> add = (t, span) => tiles.Add(new KeyValuePair<Card, int>(t, Math.Min(span, cols)));
+        if (any) { add(savesTile, 1); add(storeTile, 1); add(updTile, 1); }
+        if (cols == 3) { add(gamesCard, 2); add(mgrTile, 1); }
+        else if (cols == 2 && any) { add(mgrTile, 1); add(gamesCard, 2); }
+        else { add(gamesCard, 1); add(mgrTile, 1); }
+        int k0 = 0;
+        while (k0 < tiles.Count)
+        {
+            int used = 0, k1 = k0, rh = 0;
+            while (k1 < tiles.Count && used + tiles[k1].Value <= cols) { rh = Math.Max(rh, InfoHeight(tiles[k1].Key)); used += tiles[k1].Value; k1++; }
+            int x = px;
+            for (int j = k0; j < k1; j++)
+            {
+                int span = tiles[j].Value, w = span * tw + (span - 1) * gap;
+                LayoutInfo(tiles[j].Key, x, cy, w, rh);
+                x += w + gap;
+            }
+            cy += rh + gap;
+            k0 = k1;
         }
         ResumeLayout();
+        // the glow is drawn for the window size: everything again when that changed
+        if (laidOut != ClientSize) { laidOut = ClientSize; buildsPage.Invalidate(true); }
+        contentHeight = cy - cardsHost.AutoScrollPosition.Y - gap;
+        // an emulator added or removed, or the first one installed (the small tiles appear): the window fits again
+        string key = cards.Count + "|" + any;
+        if (contentKey != null && key != contentKey && IsHandleCreated) BeginInvoke((MethodInvoker)delegate { FitHeight(); });
+        contentKey = key;
     }
 
-    // One card at width w; returns its height. The card's children are given Card.Shift (S) by hand here.
-    int LayoutCard(EmuCard c, int y, int w)
+    // ---- emulator icons: the user's own picture (Change icon...), else the built-in emulators' logos, else initials
+    static readonly Dictionary<string, Bitmap> builtIn = new Dictionary<string, Bitmap>();
+    static Bitmap BuiltInPicture(string id)
     {
-        c.More.SetBounds(w - D(60), D(8), D(44), D(30));
-        {   // installed version, right of the title, left of "..."; hidden when the title needs the room
-            int vw = TextRenderer.MeasureText(c.Ver.Text, c.Ver.Font).Width + D(4);
-            int titleEnd = 24 + TextRenderer.MeasureText(c.Def.Name ?? "", Theme.CardTitle).Width;
-            int vx = c.More.Left - D(10) - vw;
-            c.Ver.Visible = c.Ver.Text.Length > 0 && vx > titleEnd + D(12);
-            c.Ver.SetBounds(vx, D(8), vw, D(22));
-        }
-        int ly = D(22 + S);
-        Action<Control, bool> row = (ctl, show) =>
+        Bitmap b;
+        if (id == null) return null;
+        if (builtIn.TryGetValue(id, out b)) return b;
+        try
         {
-            ctl.Visible = show;
-            if (show) { ctl.SetBounds(D(24), ly, w - D(48), D(22)); ly += D(24); }
-        };
-        row(c.Note, c.Note.Text.Length > 0);
-        if (c.Note.Visible) c.Note.Width = Math.Min(c.Note.Width, w - D(96));   // leave room for the "..." button
-        row(c.State, true);
-        row(c.Data, c.Data.Text.Length > 0);
+            using (Stream st = typeof(EmuForm).Assembly.GetManifestResourceStream("badge-" + id + ".png"))
+                if (st != null) using (Bitmap t = new Bitmap(st)) b = new Bitmap(t);   // a copy: it outlives the stream
+        }
+        catch { b = null; }
+        builtIn[id] = b;
+        return b;
+    }
+    // Which built-in emulator this is: by id, or by repository (lists saved by older versions).
+    static string BuiltInId(EmuDef d)
+    {
+        foreach (EmuDef r in Core.Recommended(Core.Home))
+            if (r.Id == d.Id || d.Host == r.Host && string.Equals(d.Repo, r.Repo, StringComparison.OrdinalIgnoreCase)) return r.Id;
+        return null;
+    }
+    static string IconFile(EmuDef d) { return Path.Combine(Core.DataDir, "icons", SafeName(d.Id ?? d.Name ?? "emulator") + ".png"); }
+    static Image PictureOf(EmuDef d)
+    {
+        string f = IconFile(d);
+        if (File.Exists(f))
+            try { using (MemoryStream ms = new MemoryStream(File.ReadAllBytes(f))) using (Image im = Image.FromStream(ms)) return new Bitmap(im); }
+            catch (Exception ex) { FileLog("Icon " + f + " can't be read: " + ex.Message); }
+        return BuiltInPicture(BuiltInId(d));
+    }
+    void SetBadge(EmuCard c)
+    {
+        Image old = c.Badge.Picture;
+        c.Badge.Picture = PictureOf(c.Def);
+        InfoText();   // the saves tile shows the badges too
+        Bitmap ob = old as Bitmap;
+        if (old != null && old != c.Badge.Picture && !(ob != null && builtIn.ContainsValue(ob))) old.Dispose();
+    }
+
+    void ChangeIcon(EmuCard c)
+    {
+        string file;
+        using (OpenFileDialog o = new OpenFileDialog())
+        {
+            o.Title = "Choose a picture for " + c.Def.Name;
+            o.Filter = "Pictures|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.ico|All files|*.*";
+            if (o.ShowDialog(this) != DialogResult.OK) return;
+            file = o.FileName;
+        }
+        try
+        {
+            if (new FileInfo(file).Length > 30L << 20) throw new Exception("over 30 MB");
+            Bitmap pic;
+            if (file.EndsWith(".ico", StringComparison.OrdinalIgnoreCase)) using (Icon ic = new Icon(file, 256, 256)) pic = ic.ToBitmap();
+            else using (MemoryStream ms = new MemoryStream(File.ReadAllBytes(file))) using (Image im = Image.FromStream(ms)) pic = new Bitmap(im);
+            using (pic)
+            using (Bitmap fitted = Smooth(pic, 256))
+            {
+                string to = IconFile(c.Def);
+                Directory.CreateDirectory(Path.GetDirectoryName(to));
+                fitted.Save(to, ImageFormat.Png);   // a copy: the picture the user chose stays where it is
+            }
+            SetBadge(c);
+            Log(c.Def.Name + ": new icon from " + file + ".");
+        }
+        catch (Exception ex)
+        {
+            Log(c.Def.Name + ": that picture couldn't be used (" + ex.Message + ").");
+            Tell("Change icon", "That picture couldn't be used. Try a PNG or JPG file.");
+        }
+    }
+
+    void ResetIcon(EmuCard c)
+    {
+        try { File.Delete(IconFile(c.Def)); }   // the manager's own copy; the user's picture is untouched
+        catch (Exception ex) { Log("Could not reset the icon: " + ex.Message); return; }
+        SetBadge(c);
+        Log(c.Def.Name + ": icon reset.");
+    }
+
+    // The window's icon, from the copy of app.ico inside the app. The taskbar shows the window's big icon stretched to
+    // 24 px x the screen scale, so that size is loaded: at 100 % the hand-drawn 24 px picture (the title bar still gets
+    // the 16 px one, Windows makes it from the same icon). The exe's own icon if the copy can't be read.
+    internal static Icon AppIcon()
+    {
+        int n = 24;
+        try
+        {   // the real screen scale (this app isn't DPI-aware, so SystemInformation always says 100 %)
+            object v = Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Control Panel\Desktop\WindowMetrics", "AppliedDPI", 96);
+            if (v is int && (int)v > 96) n = 24 * (int)v / 96;
+        }
+        catch { }
+        try { using (Stream s = typeof(EmuForm).Assembly.GetManifestResourceStream("app.ico")) if (s != null) return new Icon(s, n, n); } catch { }
+        try { return Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { return null; }
+    }
+
+    // A picture shrunk to size x size with smooth edges (a plain zoom looks jagged).
+    internal static Bitmap Smooth(Image src, int size)
+    {
+        Bitmap b = new Bitmap(size, size, PixelFormat.Format32bppPArgb);
+        using (Graphics g = Graphics.FromImage(b))
+        {
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.PixelOffsetMode = PixelOffsetMode.HighQuality; g.SmoothingMode = SmoothingMode.AntiAlias;
+            float r = Math.Min((float)size / src.Width, (float)size / src.Height);
+            float w = src.Width * r, h = src.Height * r;
+            using (ImageAttributes ia = new ImageAttributes())
+            {
+                ia.SetWrapMode(WrapMode.TileFlipXY);   // no grey fringe at the edges
+                g.DrawImage(src, new Rectangle((int)((size - w) / 2), (int)((size - h) / 2), (int)w, (int)h), 0, 0, src.Width, src.Height, GraphicsUnit.Pixel, ia);
+            }
+        }
+        return b;
+    }
+
+    // The window as tall as its tiles need: no empty space under them, and no scrolling when the screen has room.
+    // On opening, and when emulators are added or removed; the user's own resizing is left alone otherwise.
+    int contentHeight; string contentKey;
+    void OnScreen()
+    {
+        if (WindowState != FormWindowState.Normal) return;
+        Rectangle wa = Screen.FromControl(this).WorkingArea;
+        int w = Math.Min(Width, wa.Width), h = Math.Min(Height, wa.Height);
+        Rectangle b = new Rectangle(Math.Max(wa.Left, Math.Min(Left, wa.Right - w)), Math.Max(wa.Top, Math.Min(Top, wa.Bottom - h)), w, h);
+        if (b != Bounds) Bounds = b;
+    }
+    void FitHeight()
+    {
+        if (WindowState != FormWindowState.Normal || !IsHandleCreated || contentHeight <= 0) return;
+        int need = cardsHost.Top + contentHeight + D(32) + D(34);   // tiles, a little room above the status line, the status line
+        int diff = need - ClientSize.Height;
+        if (diff > 0) diff = Math.Min(diff, Math.Max(0, Screen.FromControl(this).WorkingArea.Bottom - Bottom));   // grow down, staying on the screen
+        if (Math.Abs(diff) < D(4)) return;
+        int h = Math.Max(MinimumSize.Height, Height + diff);
+        if (h != Height) Height = h;
+    }
+
+    // Lays out once more after the current event (a status that no longer fits its place, and the like).
+    void LayoutSoon()
+    {
+        if (layoutQueued || !IsHandleCreated) return;
+        layoutQueued = true;
+        BeginInvoke((MethodInvoker)delegate { layoutQueued = false; DoLayout(); });
+    }
+
+    // The height a text needs at width w, up to maxLines lines.
+    static int TextHeight(string t, Font f, int w, int maxLines)
+    {
+        int line = TextRenderer.MeasureText("Ag", f).Height;
+        int h = TextRenderer.MeasureText(t ?? "", f, new Size(Math.Max(10, w), 0), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height;
+        return Math.Max(1, Math.Min(maxLines, (h + line / 2) / line)) * line;
+    }
+
+    // One emulator tile at (x, y), width w. h > 0: that height (the row's), with the buttons at the bottom.
+    // Returns the height the tile needs.
+    int LayoutCard(EmuCard c, int x, int y, int w, int h)
+    {
+        int P = D(18), iw = w - 2 * P, chipH = D(26), bh = D(40), L = P - D(3);   // L: labels (their text starts a little in)
+        c.Badge.SetBounds(P, P, D(40), D(40));
+        int need = ((StatusChip)c.State).Needed(chipH);
+        c.ChipTop = !c.Busy && need <= iw - D(40) - D(12);   // a job's progress gets a line of its own, above its bar
+        if (c.ChipTop) c.State.SetBounds(w - P - need, P + (D(40) - chipH) / 2, need, chipH);
+        int ly = P + D(40) + D(10);
+        c.Title.SetBounds(P - D(4), ly, iw + D(4), D(30)); ly += D(32);
+        if (!c.ChipTop)
+        {
+            int hh = chipH;
+            if (need > iw)
+            {   // too long for one line: the chip grows downward (up to three lines)
+                int textW = iw - (need - TextRenderer.MeasureText(c.State.Text, c.State.Font, new Size(4000, chipH), TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width);
+                int line = TextRenderer.MeasureText("Ag", c.State.Font).Height;
+                hh = Math.Max(chipH, TextHeight(c.State.Text, c.State.Font, Math.Max(D(40), textW), 3) + (chipH - line));
+            }
+            c.State.SetBounds(P, ly, Math.Min(need, iw), hh); ly += hh + D(8);
+        }
+        c.Note.Visible = c.Note.Text.Length > 0;
+        if (c.Note.Visible) { int nh = TextHeight(c.Note.Text, c.Note.Font, iw, 2); c.Note.SetBounds(L, ly, iw + D(3), nh); ly += nh + D(6); }
+        c.Ver.Visible = c.Ver.Text.Length > 0;
+        if (c.Ver.Visible) { c.Ver.SetBounds(L, ly, iw + D(3), D(20)); ly += D(22); }
+        c.Data.Visible = c.Data.Text.Length > 0;
+        if (c.Data.Visible) { int dh = TextHeight(c.Data.Text, c.Data.Font, iw, 2); c.Data.SetBounds(L, ly, iw + D(3), dh); ly += dh + D(2); }
         c.Next.Visible = c.NextKind != null && !c.Busy && !IsBusy;
-        if (c.Next.Visible) { c.Next.SetBounds(D(24), ly, Math.Min(w - D(48), TextRenderer.MeasureText(c.Next.Text, Font).Width + D(8)), D(22)); ly += D(24); }
-        if (c.Bar.Visible) { c.Bar.SetBounds(D(24), ly + D(4), w - D(48), D(8)); ly += D(16); }
-        ly += D(8);
-        List<Control> bs = new List<Control>(); List<int> ws = new List<int>();
-        if (c.Launch.Visible) { bs.Add(c.Launch); ws.Add(130); }
-        if (c.Update.Visible) { bs.Add(c.Update); ws.Add(130); }
-        int last = Flow(bs.ToArray(), ws.ToArray(), D(24), ly, w - D(16));
+        if (c.Next.Visible) { ly += D(2); c.Next.SetBounds(L, ly, Math.Min(iw, TextRenderer.MeasureText(c.Next.Text, Font).Width + D(8)), D(22)); ly += D(24); }
+        if (c.Bar.Visible) { ly += D(6); c.Bar.SetBounds(P, ly, iw, D(8)); ly += D(10); }
+        c.Share.Visible = Installed(c.Def) && UserData.IsPortable(c.Def);
+        int low = bh + (c.Share.Visible ? D(30) + D(10) : 0) + (c.Existing.Visible ? D(22) + D(10) : 0);
+        int natural = ly + D(14) + low + P;
+        h = Math.Max(h, natural);
+
+        // bottom: [Launch        ][Update][...]   or   [Install          ][...]
+        int by = h - P - bh;
+        c.More.SetBounds(w - P - D(46), by, D(46), bh);
+        int r = c.More.Left - D(8);
+        if (c.Launch.Visible)
+        {
+            if (c.Update.Visible)
+            {
+                int uw = Math.Max(D(96), TextRenderer.MeasureText(c.Update.Text, c.Update.Font).Width + D(30));
+                c.Update.SetBounds(r - uw, by, uw, bh); r -= uw + D(8);
+            }
+            c.Launch.SetBounds(P, by, Math.Max(D(60), r - P), bh);
+        }
+        else if (c.Update.Visible) c.Update.SetBounds(P, by, Math.Max(D(60), r - P), bh);
+        int sy = by - D(10);
         if (c.Existing.Visible)
         {
             int ew = TextRenderer.MeasureText(c.Existing.Text, Font).Width + D(6);
-            int ex = bs.Count > 0 ? bs[bs.Count - 1].Right + D(16) : D(24);
-            if (ex + ew > w - D(16)) { ex = D(24); last += D(42); }
-            c.Existing.SetBounds(ex, last + D(8), ew, D(22));
+            sy -= D(22); c.Existing.SetBounds(L, sy, Math.Min(iw, ew), D(22)); sy -= D(10);
         }
-        int h = last + D(34) + D(18);
-        // the share tick: bottom right of the card, beside the buttons (on a line of its own when the card is narrow)
-        c.Share.Visible = Installed(c.Def) && UserData.IsPortable(c.Def);
-        if (c.Share.Visible)
+        if (c.Share.Visible) { sy -= D(30); c.Share.SetBounds(P, sy, iw, D(30)); }
+        c.Box.SetBounds(x, y, w, h);
+        return natural;
+    }
+
+    // A status that changed length (download progress...): moved in place, or a new layout when it changes rows.
+    void ChipMoved(EmuCard c)
+    {
+        int w = c.Box.Width, P = D(18), chipH = D(26);
+        if (w <= 0) return;
+        int need = ((StatusChip)c.State).Needed(chipH);
+        bool top = !c.Busy && need <= w - 2 * P - D(40) - D(12);
+        if (top != c.ChipTop || !top) { LayoutSoon(); return; }   // on its own line it may need more lines: lay out again
+        c.State.SetBounds(w - P - need, c.State.Top, need, chipH);
+        c.State.Invalidate();
+    }
+
+    int InfoHeight(Card t)
+    {
+        return t == savesTile ? D(178) : t == storeTile ? D(178) : t == updTile ? D(190) : D(104);
+    }
+
+    // The small tiles' insides.
+    void LayoutInfo(Card t, int x, int y, int w, int h)
+    {
+        int P = D(18), iw = w - 2 * P;
+        t.SetBounds(x, y, w, h);
+        if (t == savesTile)
         {
-            int sw = Math.Min(w - D(40), TextRenderer.MeasureText(c.Share.Text, Font).Width + D(34));
-            int sx = w - D(20) - sw, right = D(24);
-            foreach (Control b in bs) if (b.Top == last) right = Math.Max(right, b.Right);
-            if (c.Existing.Visible && c.Existing.Top >= last) right = Math.Max(right, c.Existing.Right);
-            c.Share.BackColor = Theme.Card; c.Share.ForeColor = Theme.Text;
-            if (sx > right + D(16)) c.Share.SetBounds(sx, last + D(4), sw, D(26));
-            else { c.Share.SetBounds(Math.Max(D(22), sx), last + D(34) + D(12), sw, D(26)); h = c.Share.Bottom + D(14); }
+            int lw = TextRenderer.MeasureText(savesLink.Text, Font).Width + D(6);
+            savesCap.SetBounds(P, P, Math.Max(D(20), iw - lw - D(8)), D(20));
+            savesLink.SetBounds(w - P - lw, P, lw, D(20));
+            int bw = TextRenderer.MeasureText(savesBig.Text, Theme.Big).Width;
+            savesBig.SetBounds(P - D(4), P + D(24), bw, D(52));
+            int uw = TextRenderer.MeasureText(savesUnit.Text, Theme.Value).Width + D(6);
+            savesUnit.SetBounds(savesBig.Right, P + D(46), uw, D(26));
+            savesLine.SetBounds(P, P + D(82), iw, D(20));
+            savesWho.SetBounds(P, P + D(110), iw, D(32));
         }
-        c.Box.SetBounds(0, y, w, h);
-        c.Box.Invalidate();
-        return h;
+        else if (t == storeTile)
+        {
+            storeCap.SetBounds(P, P, iw, D(20));
+            storeRing.SetBounds(P, P + D(30), iw, Math.Min(D(108), h - P - D(30) - D(10)));
+        }
+        else if (t == updTile)
+        {
+            updCap.SetBounds(P, P, iw, D(20));
+            updText.SetBounds(P, P + D(26), iw, D(28));
+            updWhen.SetBounds(P, P + D(56), iw, D(20));
+            updBars.SetBounds(P, P + D(84), iw, D(44));
+            updLine.SetBounds(P, P + D(134), iw, D(20));
+        }
+        else if (t == gamesCard)
+        {
+            gamesCap.SetBounds(P, P, iw, D(20));
+            gamesPick.SetBounds(w - P - D(112), P + D(28), D(112), D(38));
+            gamesLbl.SetBounds(P, P + D(32), Math.Max(D(40), iw - D(124)), D(30));
+        }
+        else if (t == mgrTile)
+        {
+            mgrCap.SetBounds(P, P, iw, D(20));
+            int cw = mgrChip.Visible ? mgrChip.Needed(D(26)) : 0;
+            mgrChip.SetBounds(w - P - cw, P + D(34), cw, D(26));
+            mgrText.SetBounds(P, P + D(32), Math.Max(D(40), iw - cw - D(10)), D(30));
+        }
+        t.Invalidate();
+    }
+
+    // ---- the small tiles' contents: saves, storage, update activity (read from disk on a worker thread)
+    class InfoData
+    {
+        public int SharedGames, AllGames;                 // games with saves in the shared folder / in any emulator's saves
+        public long Emus, Shared, Older, Aside;
+        public bool HasSizes;                             // sizes were read (a quick read keeps the last ones)
+        public int[] Days = new int[7];                   // new versions per day, oldest first (today last)
+        public string Key;                                // the installed emulators it was read for
+    }
+    string InstalledKey() { return string.Join("|", cards.Where(k => Installed(k.Def)).Select(k => k.Def.Id).OrderBy(x => x)); }
+    InfoData info;
+    bool scanning, scanAgain, againSizes, rescanQueued;
+    DateTime scannedAt = DateTime.MinValue;
+
+    static long DirBytes(string dir)
+    {
+        long n = 0;
+        try
+        {
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return 0;
+            Stack<DirectoryInfo> st = new Stack<DirectoryInfo>();
+            st.Push(new DirectoryInfo(dir));
+            while (st.Count > 0)
+            {
+                DirectoryInfo d = st.Pop();
+                try
+                {
+                    foreach (FileInfo f in d.EnumerateFiles()) n += f.Length;
+                    foreach (DirectoryInfo sub in d.EnumerateDirectories())
+                        if ((sub.Attributes & FileAttributes.ReparsePoint) == 0) st.Push(sub);   // shared folders are counted once, as Shared data
+                }
+                catch { }
+            }
+        }
+        catch { }
+        return n;
+    }
+
+    // now: read again even if it was read a moment ago (else at most every 20 seconds); sizes: walk the folders too
+    // (slow), else only the save counts and the update dates. Each part that fails keeps what it showed before.
+    void ScanInfo(bool now = false, bool sizes = true)
+    {
+        if (scanning) { if (now) { scanAgain = true; againSizes |= sizes; } return; }
+        if (!now && DateTime.Now - scannedAt < TimeSpan.FromSeconds(20)) return;
+        scanning = true;
+        List<EmuDef> defs = cards.Select(k => k.Def).ToList();
+        string key = InstalledKey();
+        InfoData old = info;
+        bool walk = sizes || old == null || !old.HasSizes;
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            InfoData r = new InfoData(); r.Key = key;
+            List<EmuDef> inst = new List<EmuDef>();
+            try { inst = defs.Where(Installed).ToList(); } catch { }
+            try
+            {
+                r.SharedGames = UserData.CountGames(Path.Combine(UserData.SharedRoot, @"nand\user\save"));
+                HashSet<string> games = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (EmuDef d in inst)
+                {
+                    UserData.SaveKind kind; string saves = UserData.SavesOf(d, out kind);
+                    if (saves != null) games.UnionWith(UserData.GamesIn(saves));
+                }
+                r.AllGames = games.Count;
+            }
+            catch (Exception ex) { FileLog("Counting saves failed: " + ex.Message); if (old != null) { r.SharedGames = old.SharedGames; r.AllGames = old.AllGames; } }
+            if (walk)
+                try
+                {
+                    foreach (EmuDef d in inst) r.Emus += DirBytes(d.Dir);
+                    string aside = Path.Combine(UserData.SharedRoot, UserData.SET_ASIDE);
+                    r.Aside = DirBytes(aside);
+                    r.Shared = Math.Max(0, DirBytes(UserData.SharedRoot) - r.Aside);
+                    HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (EmuDef d in defs)
+                        foreach (string b in Core.Backups(d))
+                            if (seen.Add(Path.GetFullPath(b).TrimEnd('\\'))) r.Older += DirBytes(b);
+                    r.HasSizes = true;
+                }
+                catch (Exception ex) { FileLog("Reading sizes failed: " + ex.Message); walk = false; }
+            if (!walk && old != null) { r.Emus = old.Emus; r.Shared = old.Shared; r.Older = old.Older; r.Aside = old.Aside; r.HasSizes = old.HasSizes; }
+            try
+            {
+                DateTime today = DateTime.Today;
+                foreach (EmuDef d in inst)
+                    foreach (DateTime t in Core.RecentReleaseDates(d))
+                    {
+                        int ago = (today - t.Date).Days;
+                        if (ago >= 0 && ago < 7) r.Days[6 - ago]++;
+                    }
+            }
+            catch (Exception ex) { FileLog("Reading update dates failed: " + ex.Message); if (old != null) r.Days = old.Days; }
+            UI(delegate
+            {
+                scanning = false; scannedAt = DateTime.Now; info = r;
+                DoLayout();
+                if (scanAgain) { bool full = againSizes; scanAgain = againSizes = false; ScanInfo(true, full); }
+            });
+        });
+    }
+
+    static void Txt(Control c, string t) { if (c.Text != t) c.Text = t; }
+
+    void InfoText()
+    {
+        List<EmuCard> inst = cards.Where(k => Installed(k.Def)).ToList();
+        InfoData r = info;
+        if (r != null && !scanning && !rescanQueued && r.Key != InstalledKey() && IsHandleCreated)
+        {   // an emulator was added, removed or found: read again (once)
+            rescanQueued = true;
+            BeginInvoke((MethodInvoker)delegate { rescanQueued = false; ScanInfo(true); });
+        }
+        // saves: who shares comes from the cards (Refresh keeps it current), the counts from the last scan
+        EmuCard hostCard = Core.Cfg.ShareHost == null ? null : inst.FirstOrDefault(k => k.Def.Id == Core.Cfg.ShareHost && k.Joined);
+        bool sharing = hostCard != null;
+        List<EmuCard> users = sharing ? inst.Where(k => k.Joined).ToList() : inst;
+        int games = r == null ? 0 : sharing ? r.SharedGames : r.AllGames;
+        Txt(savesCap, sharing ? "Shared saves" : "Saves");
+        Txt(savesBig, r == null ? "-" : games.ToString());
+        Txt(savesUnit, games == 1 ? "game" : "games");
+        string host = sharing ? hostCard.Def.Name : "";
+        Txt(savesLine, sharing ? (users.Count >= 2 && users.Count == inst.Count ? "All " + users.Count + " emulators use " + host + "'s saves"
+                                  : users.Count >= 2 ? users.Count + " emulators use " + host + "'s saves" : "Shared from " + host)
+                     : inst.Count > 1 ? "Each emulator keeps its own saves" : inst.Count == 1 ? "Saved in " + inst[0].Def.Name : "");
+        savesWho.People = users.Select(k => Tuple.Create(k.Badge.Text, k.Badge.Tone, k.Badge.Picture)).ToList();
+        savesWho.Invalidate();
+        // storage
+        List<Tuple<string, long, Color>> parts = new List<Tuple<string, long, Color>>();
+        if (r != null)
+        {
+            parts.Add(Tuple.Create("Emulators", r.Emus, Theme.Accent));
+            if (r.Shared > 0) parts.Add(Tuple.Create("Shared data", r.Shared, Theme.Accent2));
+            if (r.Older > 0) parts.Add(Tuple.Create("Older builds", r.Older, Theme.Accent3));
+            if (r.Aside > 0) parts.Add(Tuple.Create("Backups", r.Aside, Theme.StrokeStrong));
+        }
+        storeRing.Parts = parts;
+        storeRing.Center = r == null ? "..." : Ring.Bytes(parts.Sum(p => p.Item2));
+        storeRing.Invalidate();
+        // updates
+        int upd = cards.Count(k => k.Rel != null && Installed(k.Def) && !Current(k));
+        bool failed = cards.Any(k => k.CheckErr != null && Installed(k.Def));
+        bool busyCheck = checking || checksRunning > 0, never = checkedAt == DateTime.MinValue;
+        Txt(updText, busyCheck ? "Checking..." : upd == 1 ? "1 update available" : upd > 1 ? upd + " updates available"
+                   : failed ? "Couldn't check" : never ? "Not checked yet" : "Everything is up to date");
+        roles[updText] = busyCheck || (never && !failed && upd == 0) ? "muted" : upd > 0 ? "info" : failed ? "danger" : "success";
+        updText.ForeColor = RoleColor(updText);
+        TimeSpan ago = DateTime.Now - checkedAt;
+        Txt(updWhen, checkedAt == DateTime.MinValue ? "" : ago.TotalMinutes < 1 ? "Checked just now" : ago.TotalMinutes < 2 ? "Checked 1 minute ago"
+                   : ago.TotalMinutes < 60 ? "Checked " + (int)ago.TotalMinutes + " minutes ago" : "Checked at " + checkedAt.ToString("t"));
+        updBars.Values = r != null ? r.Days : new int[7];
+        updBars.Invalidate();
+        int week = r != null ? r.Days.Sum() : 0;
+        Txt(updLine, r == null ? "" : week == 0 ? "No new versions this week" : week == 1 ? "1 new version this week" : week + " new versions this week");
+        // manager
+        Txt(mgrText, "Version " + Core.AppVersion);
+        mgrChip.Visible = mgrChecked && !(anyBusy && mgrRel != null);
+        Txt(mgrChip, mgrRel != null ? "Update to " + mgrVer : "Latest");
+        roles[mgrChip] = mgrRel != null ? "info" : "success";
+        mgrChip.ForeColor = RoleColor(mgrChip);
+        mgrChip.Cursor = mgrRel != null ? Cursors.Hand : Cursors.Default;
+        tips.SetToolTip(mgrChip, mgrRel != null ? "Click to update the manager" : null);
+    }
+
+    // Two letters for an emulator: "Eglantine Main" -> EM, "PokeDinner" -> PD, "Lichii" -> LI.
+    static string Initials(string name)
+    {
+        string[] w = System.Text.RegularExpressions.Regex.Replace(name ?? "?", @"\([^)]*\)", " ").Split(new[] { ' ', '-', '_', '(', ')' }, StringSplitOptions.RemoveEmptyEntries);
+        if (w.Length == 0) return "?";
+        if (w.Length > 1) return (w[0].Substring(0, 1) + w[1].Substring(0, 1)).ToUpper();
+        string one = w[0];
+        for (int i = 1; i < one.Length; i++) if (char.IsUpper(one[i])) return (one.Substring(0, 1) + one[i]).ToUpper();
+        return (one.Length > 1 ? one.Substring(0, 2) : one).ToUpper();
+    }
+
+    // ---- a picture of the window laid over it, then faded out: the colours change smoothly
+    [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
+    [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);
+    Form Snapshot(Form keepOnTop)
+    {
+        try
+        {
+            if (!Visible || WindowState == FormWindowState.Minimized || ClientSize.Width < 10 || ClientSize.Height < 10) return null;
+            Rectangle wr = Bounds;
+            Bitmap whole = new Bitmap(wr.Width, wr.Height, PixelFormat.Format32bppArgb);
+            using (Graphics g = Graphics.FromImage(whole))
+            {
+                IntPtr hdc = g.GetHdc();
+                bool ok;
+                try { ok = PrintWindow(Handle, hdc, 2); } finally { g.ReleaseHdc(hdc); }
+                if (!ok) { whole.Dispose(); return null; }
+            }
+            Point c0 = PointToScreen(Point.Empty);
+            Rectangle cr = new Rectangle(c0.X - wr.X, c0.Y - wr.Y, ClientSize.Width, ClientSize.Height);
+            Bitmap pic = whole.Clone(cr, PixelFormat.Format32bppArgb);
+            whole.Dispose();
+            FadeForm f = new FadeForm();
+            f.FormBorderStyle = FormBorderStyle.None; f.ShowInTaskbar = false; f.StartPosition = FormStartPosition.Manual;
+            f.Bounds = new Rectangle(c0, ClientSize);
+            f.BackColor = Theme.Window;
+            f.BackgroundImage = pic; f.BackgroundImageLayout = ImageLayout.None;
+            f.Opacity = 0.999;
+            f.Disposed += delegate { pic.Dispose(); };
+            IntPtr above = GetWindow(Handle, 3);   // GW_HWNDPREV: the window just above the main window, before the picture exists
+            f.Show(this);
+            if (above != IntPtr.Zero) Native.Below(f.Handle, above);   // right on the main window: its other windows stay on top
+            else if (keepOnTop != null && !keepOnTop.IsDisposed) Native.Raise(keepOnTop.Handle);
+            f.Update();
+            return f;
+        }
+        catch (Exception ex) { FileLog("No colour fade: " + ex.Message); return null; }
+    }
+    static void CrossFade(Form f)
+    {
+        System.Windows.Forms.Timer t = new System.Windows.Forms.Timer(); t.Interval = 15;
+        Stopwatch sw = Stopwatch.StartNew();
+        t.Tick += delegate
+        {
+            double v = Math.Min(1, sw.ElapsedMilliseconds / 260.0);
+            if (v >= 1 || f.IsDisposed) { t.Stop(); t.Dispose(); if (!f.IsDisposed) f.Close(); return; }
+            f.Opacity = 1 - v * v * (3 - 2 * v);
+        };
+        t.Start();
+    }
+
+    // ---- Colors: the six schemes; a click applies one at once and the manager remembers it
+    Form colorsForm;
+    void ShowColors()
+    {
+        if (colorsForm != null && !colorsForm.IsDisposed) { colorsForm.Activate(); return; }
+        QuietForm f = new QuietForm(); colorsForm = f;
+        f.Text = "Themes"; f.Font = Font; f.Icon = Icon; f.ShowInTaskbar = false;
+        f.FormBorderStyle = FormBorderStyle.FixedDialog; f.MaximizeBox = false; f.MinimizeBox = false;
+        f.StartPosition = FormStartPosition.CenterParent;
+        const int cols = 4;   // a row per colour family
+        int sw = D(150), sh = D(104), g = D(12), W = D(24) * 2 + sw * cols + g * (cols - 1);
+        ToolTip ftips = new ToolTip(); f.Disposed += delegate { ftips.Dispose(); };
+        Label t = new Label(); t.Text = "Pick the colors you like."; t.SetBounds(D(24), D(18), W - D(48), D(24)); f.Controls.Add(t);
+        List<Swatch> all = new List<Swatch>();
+        Button done = new Button(); done.Text = "Done";
+        Action paint = () =>
+        {
+            f.BackColor = Theme.Window; t.ForeColor = Theme.Muted; t.BackColor = Theme.Window;
+            done.BackColor = Theme.Window; done.ForeColor = Theme.Text;
+            foreach (Swatch x in all) x.Invalidate();
+            done.Invalidate();
+            if (f.IsHandleCreated) Native.Apply(f.Handle, true, 0);
+        };
+        Action<Swatch> choose = x =>
+        {
+            if (Theme.Scheme == x.Scheme[0]) return;
+            Core.Cfg.Colors = x.Scheme[0];
+            try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save the colors: " + ex.Message); }
+            Form fade = Snapshot(f);
+            ApplyStyle(); DoLayout(); paint();
+            if (fade != null) CrossFade(fade);
+            if (logForm != null && !logForm.IsDisposed) { logForm.BackColor = Theme.Window; logForm.Invalidate(true); }
+        };
+        for (int i = 0; i < Theme.Schemes.Length; i++)
+        {
+            Swatch x = new Swatch(); x.Scheme = Theme.Schemes[i];
+            x.SetBounds(D(24) + (i % cols) * (sw + g), D(54) + (i / cols) * (sh + g), sw, sh);
+            ftips.SetToolTip(x, x.Scheme[1]);
+            x.Click += delegate { choose(x); };
+            all.Add(x); f.Controls.Add(x);
+        }
+        if (Demo != null && Demo.StartsWith("colors:"))
+        {   // test: pick a scheme by itself a moment after opening (the fade from one look to the other)
+            System.Windows.Forms.Timer dt = new System.Windows.Forms.Timer(); dt.Interval = 1500;
+            dt.Tick += delegate { dt.Stop(); Swatch pick = all.FirstOrDefault(k => k.Scheme[0] == Demo.Substring(7)); if (pick != null) choose(pick); };
+            dt.Start();
+        }
+        Swatch cur = all.FirstOrDefault(k => k.Scheme[0] == Theme.Scheme);
+        if (cur != null) f.ActiveControl = cur;   // the keyboard starts on the colours in use
+        int by = D(54) + (Theme.Schemes.Length + cols - 1) / cols * (sh + g) + D(6);
+        done.SetBounds(W - D(24) - D(110), by, D(110), D(38));
+        StyleButton(done); Outline(done, Theme.Accent);
+        done.Click += delegate { f.Close(); };
+        f.Controls.Add(done);
+        f.AcceptButton = done; f.CancelButton = done;
+        f.ClientSize = new Size(W, by + D(38) + D(20));
+        f.HandleCreated += delegate { Native.Apply(f.Handle, true, 0); };
+        paint();
+        if (Demo == null) { f.ShowDialog(this); f.Dispose(); colorsForm = null; return; }
+        f.StartPosition = FormStartPosition.Manual;   // a screenshot: over the main window, wherever that is
+        f.Location = new Point(Left + (Width - f.Width) / 2, Top + (Height - f.Height) / 2);
+        f.Show(this);
     }
 
     EmuCard MakeCard(EmuDef d)
     {
         EmuCard c = new EmuCard(); c.Def = d;
-        c.Box.Text = d.Name;
+        c.Box.Text = ""; c.Box.Shift = 0; c.Box.Radius = D(20); c.Box.Hover = true;
+        c.Title.Text = d.Name; c.Title.AutoEllipsis = true; fontRoles[c.Title] = "name";
+        c.Badge.Text = Initials(d.Name);
+        c.Badge.Picture = PictureOf(d);
         c.Note.AutoEllipsis = true; roles[c.Note] = "muted";
-        c.State.AutoEllipsis = true; strong.Add(c.State);
+        fontRoles[c.State] = "small";
+        c.State.TextChanged += delegate { ChipMoved(c); };
         c.Data.AutoEllipsis = true; roles[c.Data] = "muted";
-        c.Ver.AutoEllipsis = true; c.Ver.TextAlign = ContentAlignment.MiddleRight; roles[c.Ver] = "muted";
+        c.Ver.AutoEllipsis = true; roles[c.Ver] = "muted";
         c.Bar.Visible = false;
-        c.Update.Text = "Install"; c.Launch.Text = "Launch"; c.More.Text = "...";
+        c.Update.Text = "Install"; c.Launch.Text = "Launch"; c.More.Text = "···";
         c.Launch.TabStop = false;   // keyboard focus never rests on Launch
         c.Launch.MouseDown += delegate { launchDown = DateTime.Now; };
-        Outline(c.Update, Theme.Accent); Outline(c.Launch, Theme.Accent);
+        Outline(c.Launch, Theme.Accent);
         tips.SetToolTip(c.More, "More");
         c.Existing.Text = "I already have it";
         c.Share.Text = "Share data with other emulators"; c.Share.AutoCheck = false;   // its state comes from Refresh
         c.Share.Click += delegate { ToggleShare(c); };
         tips.SetToolTip(c.Share, "Your other emulators use this one's keys, firmware and saves, so progress shows up in all of them. Their own data is kept as a backup.");
-        StyleCheck(c.Share);
-        c.Box.Controls.AddRange(new Control[] { c.Note, c.More, c.State, c.Data, c.Next, c.Bar, c.Launch, c.Update, c.Existing, c.Ver, c.Share });
+        StyleCheck(c.Share); toggles.Add(c.Share);
+        c.Box.Controls.AddRange(new Control[] { c.Badge, c.Title, c.Note, c.More, c.State, c.Data, c.Next, c.Bar, c.Launch, c.Update, c.Existing, c.Ver, c.Share });
         cardsHost.Controls.Add(c.Box);
 
         c.Update.Click += delegate { DoUpdate(c); };
@@ -1200,9 +2435,10 @@ class EmuForm : Form
         c.Note.Text = string.IsNullOrEmpty(d.Note) ? "" : "Best for: " + d.Note;
         Manifest m = Core.LoadManifest(d.Dir);
         bool installed = Installed(d);
-        c.Ver.Text = installed ? "Version " + (m != null && !string.IsNullOrEmpty(m.Tag) ? m.Tag : "unknown") : "";
         bool current = installed && m != null && c.Rel != null && m.Tag == c.Rel.Tag;
         bool update = installed && c.Rel != null && !current;
+        c.Ver.Text = installed ? "Version " + (m != null && !string.IsNullOrEmpty(m.Tag) ? m.Tag : "unknown") + (update && !string.IsNullOrEmpty(c.Rel.Tag) ? "  →  " + c.Rel.Tag : "") : "";
+        c.Title.Text = d.Name; c.Badge.Text = Initials(d.Name);
         List<KeyValuePair<string, string>> other = c.Busy ? new List<KeyValuePair<string, string>>() : Core.OtherInstalls(d);
         if (c.Busy) { }
         else if ((c.Err ?? c.CheckErr) != null) { c.State.Text = c.Err ?? c.CheckErr; roles[c.State] = "danger"; }
@@ -1214,9 +2450,10 @@ class EmuForm : Form
         else { c.State.Text = "Update available"; roles[c.State] = "info"; }
         c.State.Cursor = (c.Err ?? c.CheckErr) != null ? Cursors.Hand : Cursors.Default;
         c.State.ForeColor = RoleColor(c.State);
-        tips.SetToolTip(c.State, (c.Err ?? c.CheckErr) != null ? "Click to see details." : installed ? "Version: " + (m != null ? m.Tag : "unknown") : null);
+        tips.SetToolTip(c.State, (c.Err ?? c.CheckErr) != null ? (c.Err ?? c.CheckErr) + "\r\nClick to see details." : installed ? "Version: " + (m != null ? m.Tag : "unknown") : null);
 
         bool portable = installed && UserData.IsPortable(d);
+        c.Joined = false;
         List<UserData.Item> shared = portable ? UserData.SharedItems(d) : new List<UserData.Item>();
         EmuDef hostDef = Core.Cfg.ShareHost == null ? null : Core.Cfg.Emulators.FirstOrDefault(x => x.Id == Core.Cfg.ShareHost);
         bool hostHere = hostDef != null && cards.Any(k => k.Def == hostDef && Installed(k.Def) && UserData.IsPortable(k.Def));
@@ -1224,6 +2461,7 @@ class EmuForm : Form
         else if (hostDef != null && portable)
         {
             bool all = UserData.HostItems.All(i => UserData.StateOf(d, i) == UserData.State.On);
+            c.Joined = hostDef == d || all;
             if (hostDef == d) c.Data.Text = "Your other emulators use this data.";
             else if (all) c.Data.Text = "Uses " + hostDef.Name + "'s data.";
             else
@@ -1249,16 +2487,16 @@ class EmuForm : Form
         c.Update.Visible = true;
         c.Update.Text = !installed ? "Install" : current ? "Up to date" : "Update";
         c.Update.Enabled = !IsBusy && !c.Busy && c.Rel != null && (!installed || update);
-        if (installed) accents.Remove(c.Update); else accents[c.Update] = Theme.Accent;   // one accent: Launch when installed
+        if (installed) accents.Remove(c.Update); else Outline(c.Update, Theme.Accent);   // one accent: Launch when installed
         c.Update.Invalidate();
         c.Existing.Visible = !installed && !c.Busy;
         c.Existing.Text = other.Count > 0 ? "Use it" : "I already have it";
         c.Existing.Enabled = !IsBusy;
         c.More.Enabled = !c.Busy;
-        if (IsHandleCreated) BeginInvoke((MethodInvoker)DoLayout);
+        LayoutSoon();   // once, after all the cards changed
     }
 
-    void RefreshAll() { foreach (EmuCard c in cards) Refresh(c); }
+    void RefreshAll() { foreach (EmuCard c in cards) Refresh(c); if (IsHandleCreated) BeginInvoke((MethodInvoker)InfoText); }
 
     void SetFooter(string text, Color color) { footer.Text = text; footer.ForeColor = color; }
 
@@ -1279,7 +2517,7 @@ class EmuForm : Form
             UI(delegate
             {
                 if (err != null) { FileLog("Manager update check failed: " + err); return; }
-                mgrRel = r; mgrVer = v;
+                mgrRel = r; mgrVer = v; mgrChecked = true;
                 mgrLink.Text = r != null ? "Update the manager to " + v : "";
                 mgrLink.Visible = r != null && !anyBusy;
                 if (r != null) Log("A newer manager is out: " + v + " (this one is " + Core.AppVersion + ").");
@@ -1333,13 +2571,16 @@ class EmuForm : Form
         });
     }
     // fresh: ask the hosts now (the user clicked Check for updates); otherwise lists from the last 10 minutes are used
+    int checkGen;   // which round of CheckAll is the latest
     void CheckAll(bool fresh = false)
     {
         CheckManager(fresh);
         if (cards.Count == 0) { SetFooter("", Theme.Muted); return; }
+        int gen = ++checkGen;   // a newer round makes this one's answers moot
         SetFooter("Checking for updates...", Theme.Muted);
+        checking = true;
         foreach (EmuCard c in cards) { c.CheckErr = null; c.Rel = null; Refresh(c); }
-        int left = cards.Count;
+        int left = cards.Count, answered = 0;
         foreach (EmuCard c0 in cards)
         {
             EmuCard c = c0;
@@ -1349,10 +2590,12 @@ class EmuForm : Form
                 try { r = Core.Latest(c.Def, fresh); } catch (Exception ex) { err = ex.Message; }
                 UI(delegate
                 {
+                    if (gen != checkGen) return;
                     c.Rel = r; c.CheckErr = err != null ? CheckFailed(err) : null; Refresh(c);
-                    if (err != null) Log(c.Def.Name + ": update check failed: " + err);
+                    if (err != null) Log(c.Def.Name + ": update check failed: " + err); else answered++;
                     if (--left == 0)
                     {
+                        checking = false; if (answered > 0) checkedAt = DateTime.Now; ScanInfo(true, false);
                         int upd = cards.Count(k => k.Rel != null && Installed(k.Def) && !Current(k));
                         if (cards.Any(k => k.CheckErr != null)) SetFooter(cards.First(k => k.CheckErr != null).CheckErr, Theme.Danger);
                         else if (upd > 0) SetFooter(upd == 1 ? "1 update available" : upd + " updates available", Theme.Info);
@@ -1736,7 +2979,7 @@ class EmuForm : Form
             f.StartPosition = FormStartPosition.CenterParent; f.Font = Font; f.BackColor = Theme.Window; f.ForeColor = Theme.Text;
             Func<string, int, Label> lab = (t, yy) => { Label l = new Label(); l.Text = t; l.SetBounds(D(16), yy, D(568), D(20)); l.ForeColor = Theme.Text; f.Controls.Add(l); return l; };
             Func<int, int, int, TextBox> box = (xx, yy, ww) => { TextBox t = new TextBox(); t.SetBounds(xx, yy, ww, D(24)); t.BackColor = Theme.Input; t.ForeColor = Theme.Text; t.BorderStyle = BorderStyle.FixedSingle; f.Controls.Add(t); return t; };
-            Func<int, ComboBox> combo = yy => { ComboBox c = new ComboBox(); c.DropDownStyle = ComboBoxStyle.DropDownList; c.SetBounds(D(16), yy, D(568), D(26)); c.BackColor = Theme.Input; c.ForeColor = Theme.Text; c.Enabled = false; f.Controls.Add(c); return c; };
+            Func<int, ComboBox> combo = yy => { ComboBox c = new ComboBox(); c.DropDownStyle = ComboBoxStyle.DropDownList; c.SetBounds(D(16), yy, D(568), D(26)); c.BackColor = Theme.Input; c.ForeColor = Theme.Text; c.Enabled = false; DarkCombo(c); f.Controls.Add(c); return c; };
 
             lab("Paste the emulator's web link:", D(12));
             TextBox url = box(D(16), D(34), D(458));
@@ -1858,7 +3101,7 @@ class EmuForm : Form
             EmuDef e = new EmuDef();
             e.Name = name.Text.Trim(); e.Note = note.Text.Trim();
             e.Host = info.Host; e.ApiBase = info.ApiBase; e.Repo = info.Repo;
-            e.Name = Core.DisplayName(e);   // "<name> (fork)", or "Eglantine Main" for the upstream repo
+            e.Name = Core.DisplayName(e);   // its name, or "Eglantine Main" for the upstream repo
             e.TagPrefix = chan.SelectedIndex > 0 ? chans[chan.SelectedIndex - 1].Prefix : "";
             e.Assets = Core.AssetPatterns(info.HasPgo && kind.SelectedIndex == 0);
             e.Dir = Path.GetFullPath(dir.Text.Trim()).TrimEnd('\\');
@@ -2199,15 +3442,18 @@ class EmuForm : Form
         return s.Length == 0 ? "New fork" : s;
     }
 
+    int checksRunning;   // single-card checks (CheckOne) still out
     void CheckOne(EmuCard c, MethodInvoker after)
     {
-        c.CheckErr = null; c.Rel = null; Refresh(c);
+        c.CheckErr = null; c.Rel = null; checksRunning++; Refresh(c);
         ThreadPool.QueueUserWorkItem(delegate
         {
             Release r = null; string err = null;
             try { r = Core.Latest(c.Def); } catch (Exception ex) { err = ex.Message; }
             UI(delegate
             {
+                checksRunning = Math.Max(0, checksRunning - 1);
+                if (err == null) checkedAt = DateTime.Now;
                 c.Rel = r; c.CheckErr = err != null ? CheckFailed(err) : null; Refresh(c);
                 if (err != null) Log(c.Def.Name + ": update check failed: " + err);
                 if (after != null) after();
@@ -2265,6 +3511,7 @@ class EmuForm : Form
                 }
                 RefreshAll();
                 if (err == null && after != null) after();
+                ScanInfo(true);   // after the follow-up: sharing settings it saves are counted too
                 BeginInvoke((MethodInvoker)RunQueue);
                 if (dupRetry) BeginInvoke((MethodInvoker)AskDuplicates);
             });
@@ -2341,6 +3588,7 @@ class EmuForm : Form
             ComboBox list = new ComboBox(); list.DropDownStyle = ComboBoxStyle.DropDownList; list.SetBounds(D(16), D(70), W - D(32), D(28));
             list.BackColor = Theme.Input; list.ForeColor = Theme.Text; list.Enabled = false;
             list.MaxDropDownItems = 10; list.IntegralHeight = true;   // 10 rows, then scroll
+            DarkCombo(list);
             Label status = new Label(); status.Text = "Loading versions..."; status.ForeColor = Theme.Muted; status.SetBounds(D(16), D(106), W - D(140), D(22)); status.AutoEllipsis = true;
             LinkLabel notes = new LinkLabel(); notes.Text = "What's new"; notes.SetBounds(W - D(116), D(106), D(100), D(22)); notes.TextAlign = ContentAlignment.MiddleRight;
             notes.LinkColor = notes.ActiveLinkColor = notes.VisitedLinkColor = Theme.Accent; notes.LinkBehavior = LinkBehavior.HoverUnderline; notes.Visible = false;
@@ -2446,7 +3694,11 @@ class EmuForm : Form
         }
     }
 
-    void Fail(EmuCard c, string msg) { Log(c.Def.Name + ": " + msg); c.Err = msg; c.State.Text = msg; roles[c.State] = "danger"; c.State.ForeColor = RoleColor(c.State); }
+    void Fail(EmuCard c, string msg)
+    {
+        Log(c.Def.Name + ": " + msg); c.Err = msg; c.State.Text = msg; roles[c.State] = "danger"; c.State.ForeColor = RoleColor(c.State);
+        tips.SetToolTip(c.State, msg + "\r\nClick to see details.");
+    }
 
     // ---- log
     public static string LogPath { get { try { Directory.CreateDirectory(Core.DataDir); } catch { } return Path.Combine(Core.DataDir, "manager.log"); } }
@@ -2462,7 +3714,56 @@ class EmuForm : Form
     void UI(MethodInvoker m) { try { if (IsHandleCreated && !IsDisposed) BeginInvoke(m); } catch { } }
 
     // ---- style (same rules as the PSU lab)
-    protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); ApplyWindow(); }
+    protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); ApplyWindow(); Native.FrameChanged(Handle); }
+
+    // No title bar: the client area takes the caption's place (the sides and bottom keep Windows' sizing edges, the
+    // shadow and the rounded corners). The header acts as the title bar: dragging moves the window, a double-click
+    // maximizes, the top edge sizes it.
+    [StructLayout(LayoutKind.Sequential)] struct NcRect { public int L, T, R, B; }
+    [StructLayout(LayoutKind.Sequential)] struct AppBarData { public int cbSize; public IntPtr hWnd; public uint uCallbackMessage; public uint uEdge; public NcRect rc; public IntPtr lParam; }
+    [DllImport("shell32.dll")] static extern IntPtr SHAppBarMessage(uint msg, ref AppBarData d);
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == 0x83 && m.WParam != IntPtr.Zero)   // WM_NCCALCSIZE
+        {
+            NcRect before = (NcRect)Marshal.PtrToStructure(m.LParam, typeof(NcRect));
+            base.WndProc(ref m);
+            NcRect after = (NcRect)Marshal.PtrToStructure(m.LParam, typeof(NcRect));
+            // maximized, the frame hangs over the screen edge: keep the top inside, as thick as the side frame
+            after.T = before.T + (Native.IsZoomed(m.HWnd) ? Math.Max(0, after.L - before.L) : 0);
+            if (Native.IsZoomed(m.HWnd))
+            {   // an auto-hiding taskbar only comes up if the window doesn't cover the whole screen: keep 2 px free on its side
+                Rectangle mon = Screen.FromRectangle(Rectangle.FromLTRB(before.L, before.T, before.R, before.B)).Bounds;
+                AppBarData q = new AppBarData(); q.cbSize = Marshal.SizeOf(typeof(AppBarData));
+                if ((SHAppBarMessage(4, ref q).ToInt64() & 1) != 0)   // ABM_GETSTATE: ABS_AUTOHIDE
+                    for (uint edge = 0; edge < 4; edge++)
+                    {
+                        AppBarData d = new AppBarData(); d.cbSize = q.cbSize; d.uEdge = edge;
+                        d.rc.L = mon.Left; d.rc.T = mon.Top; d.rc.R = mon.Right; d.rc.B = mon.Bottom;
+                        if (SHAppBarMessage(0x0B, ref d) == IntPtr.Zero) continue;   // ABM_GETAUTOHIDEBAREX: none on this side
+                        if (edge == 0) after.L += 2; else if (edge == 1) after.T += 2; else if (edge == 2) after.R -= 2; else after.B -= 2;
+                    }
+            }
+            Marshal.StructureToPtr(after, m.LParam, false);
+            m.Result = IntPtr.Zero;
+            return;
+        }
+        if (m.Msg == 0x84)   // WM_NCHITTEST
+        {
+            base.WndProc(ref m);
+            if (m.Result.ToInt64() == 1)   // HTCLIENT
+            {
+                long lp = m.LParam.ToInt64();
+                Point p = PointToClient(new Point(unchecked((short)(lp & 0xFFFF)), unchecked((short)((lp >> 16) & 0xFFFF))));
+                bool max = Native.IsZoomed(m.HWnd);
+                int edge = D(5);
+                if (!max && p.Y < edge) m.Result = (IntPtr)(p.X < D(14) ? 13 : p.X >= ClientSize.Width - D(14) ? 14 : 12);   // HTTOPLEFT / HTTOPRIGHT / HTTOP
+                else if (p.Y < headerBottom) m.Result = (IntPtr)2;   // HTCAPTION
+            }
+            return;
+        }
+        base.WndProc(ref m);
+    }
     void ApplyWindow()
     {
         glassOn = Native.Apply(Handle, Theme.Dark, 0);
@@ -2470,8 +3771,7 @@ class EmuForm : Form
 
     void ApplyStyle()
     {
-        string t = Core.Cfg.Theme;
-        Theme.Set(t == "dark" || (t == "system" && Theme.SystemDark()));
+        Theme.Set(Core.Cfg.Colors);
         head.Font = Theme.Header;
         if (IsHandleCreated) ApplyWindow();
         SuspendLayout();
@@ -2480,22 +3780,34 @@ class EmuForm : Form
         logBox.BackColor = Theme.Input; logBox.ForeColor = Theme.Text; logBox.BorderStyle = BorderStyle.FixedSingle;
         Native.ControlTheme(logBox.Handle, Theme.Dark ? "DarkMode_Explorer" : "Explorer");
         Native.ControlTheme(cardsHost.Handle, Theme.Dark ? "DarkMode_Explorer" : "Explorer");
+        foreach (EmuCard c in cards) c.Box.Glow = Color.Empty;   // DoLayout gives them the new scheme's tones
+        InfoText();
         ResumeLayout();
         Invalidate(true);
     }
 
     void Style(Control parent, Color bg)
     {
+        bool over = parent is Card || parent is GlowPanel;   // drawn over a tile or the window background
         foreach (Control c in parent.Controls)
         {
             Color inner = bg;
             if (c is Card) { c.BackColor = Theme.Card; inner = Theme.Card; }
-            else if (c is FlatBar) c.BackColor = bg;
+            else if (c is GlowPanel) { c.BackColor = Theme.Window; inner = Theme.Window; }
+            else if (c is FlatBar || c is StatusChip || c is Badge || c is Avatars || c is Ring || c is Bars || c is DiscordTag)
+            {
+                c.BackColor = bg;
+                string fr; if (fontRoles.TryGetValue(c, out fr)) c.Font = RoleFont(fr);
+                if (c is StatusChip) c.ForeColor = RoleColor(c);
+            }
+            else if (c is PictureBox) c.BackColor = over ? Color.Transparent : bg;
             else if (c is Button) { StyleButton((Button)c); c.BackColor = bg; c.ForeColor = Theme.Text; }
+            else if (c is CheckBox) { c.BackColor = bg; c.ForeColor = Theme.Text; }
             else if (c is Label)
             {
-                c.BackColor = bg; c.ForeColor = RoleColor(c);
-                c.Font = c == head || c.Font.Size > 12 ? c.Font : strong.Contains(c) ? Theme.Title : Theme.Body;
+                c.BackColor = over ? Color.Transparent : bg; c.ForeColor = RoleColor(c);
+                string fr;
+                c.Font = fontRoles.TryGetValue(c, out fr) ? RoleFont(fr) : c == head || c.Font.Size > 12 ? c.Font : strong.Contains(c) ? Theme.Title : Theme.Body;
                 LinkLabel ll = c as LinkLabel;
                 if (ll != null) { ll.LinkColor = ll.ActiveLinkColor = ll.VisitedLinkColor = Theme.Accent; ll.DisabledLinkColor = Theme.Disabled; ll.LinkBehavior = LinkBehavior.HoverUnderline; }
             }
@@ -2505,6 +3817,12 @@ class EmuForm : Form
         }
     }
 
+    static Font RoleFont(string r)
+    {
+        return r == "caption" ? Theme.Caption : r == "big" ? Theme.Big : r == "value" ? Theme.Value : r == "name" ? Theme.Name
+             : r == "small" ? Theme.Small : r == "large" ? Theme.Large : r == "strong" ? Theme.Strong : Theme.Body;
+    }
+
     static Color RoleColor(Control c)
     {
         string r;
@@ -2512,7 +3830,8 @@ class EmuForm : Form
         return r == "muted" ? Theme.Muted : r == "info" ? Theme.Info : r == "danger" ? Theme.Danger : r == "success" ? Theme.Success : r == "accent" ? Theme.Accent : Theme.Text;
     }
 
-    internal static void Outline(Button b, Color c) { accents[b] = c; }
+    // An accent button: Theme.Accent = the scheme's gradient (kept when the colors change); another colour = outlined in it.
+    internal static void Outline(Button b, Color c) { accents[b] = c == Theme.Accent ? Color.Empty : c; b.Invalidate(); }
 
     internal static void StyleButton(Button b)
     {
@@ -2520,8 +3839,28 @@ class EmuForm : Form
         b.FlatStyle = FlatStyle.Flat; b.FlatAppearance.BorderSize = 0; b.UseVisualStyleBackColor = false;
         b.Paint += PaintButton;
         EventHandler inv = delegate { b.Invalidate(); };
-        b.MouseEnter += inv; b.MouseLeave += inv; b.EnabledChanged += inv; b.TextChanged += inv;
+        b.MouseEnter += delegate { Anim.To(b, 0, 1); }; b.MouseLeave += delegate { Anim.To(b, 0, 0); };
+        b.EnabledChanged += inv; b.TextChanged += inv;
         b.MouseDown += delegate { b.Invalidate(); }; b.MouseUp += delegate { b.Invalidate(); };
+    }
+
+    // Drop-down lists drawn in the scheme's colours (Windows draws a focused one white).
+    internal static void DarkCombo(ComboBox c)
+    {
+        c.DrawMode = DrawMode.OwnerDrawFixed;
+        c.ItemHeight = (int)Math.Round(20 * Card.K);
+        c.DrawItem += delegate (object s, DrawItemEventArgs e)
+        {
+            ComboBox cb = (ComboBox)s;
+            bool edit = (e.State & DrawItemState.ComboBoxEdit) != 0, sel = (e.State & DrawItemState.Selected) != 0;
+            Color back = edit ? (cb.Focused ? Theme.Blend(Theme.Input, Theme.Accent, 0.16) : Theme.Input) : sel ? Theme.ControlHover : Theme.Input;
+            using (SolidBrush b = new SolidBrush(back)) e.Graphics.FillRectangle(b, e.Bounds);
+            if (e.Index < 0) return;
+            TextRenderer.DrawText(e.Graphics, cb.GetItemText(cb.Items[e.Index]), cb.Font, new Rectangle(e.Bounds.X + 4, e.Bounds.Y, e.Bounds.Width - 6, e.Bounds.Height),
+                                  cb.Enabled ? Theme.Text : Theme.Disabled, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        };
+        c.GotFocus += delegate { c.Invalidate(); }; c.LostFocus += delegate { c.Invalidate(); };
+        c.DropDown += delegate { Native.DarkList(c); };
     }
 
     // Check boxes drawn like the PSU lab's: rounded box, accent fill + tick when checked, text after it.
@@ -2530,53 +3869,108 @@ class EmuForm : Form
         if (!styled.Add(c)) return;
         c.Paint += PaintCheck;
         EventHandler inv = delegate { c.Invalidate(); };
-        c.MouseEnter += inv; c.MouseLeave += inv; c.EnabledChanged += inv; c.CheckedChanged += inv;
+        c.MouseEnter += delegate { Anim.To(c, 0, 1); }; c.MouseLeave += delegate { Anim.To(c, 0, 0); };
+        c.EnabledChanged += inv; c.CheckedChanged += delegate { Anim.To(c, 1, c.Checked ? 1 : 0); c.Invalidate(); };
     }
 
     static void PaintCheck(object s, PaintEventArgs e)
     {
         CheckBox c = (CheckBox)s; Graphics g = e.Graphics;
-        g.Clear(c.BackColor);
+        Theme.ParentBack(g, c);
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        bool hot = c.Enabled && c.ClientRectangle.Contains(c.PointToClient(Control.MousePosition));
-        const int box = 18;
+        float hv = c.Enabled ? Anim.Get(c, 0, 0) : 0;
+        bool hot = hv > 0.5f;
+        float K = Card.K;
+        if (toggles.Contains(c))
+        {   // a switch on the right, its text on the left; the knob slides and the colour fades in
+            float on = Anim.Get(c, 1, c.Checked ? 1 : 0);
+            float th = Math.Min(c.Height - 4, 20 * K), tw = th * 1.8f;
+            RectangleF tr = new RectangleF(c.Width - tw - 1.5f, (c.Height - th) / 2f, tw, th);
+            Theme.FillRound(g, Theme.Blend(Theme.Blend(Theme.Input, Theme.Stroke, 0.7), Theme.ControlHover, hv), Theme.Stroke, tr, th / 2, 1);
+            if (on > 0)
+                using (GraphicsPath p = Theme.Round(tr, th / 2))
+                using (LinearGradientBrush b = Theme.AccentBrush(tr, 0.10 * hv))
+                {
+                    if (on < 1) b.LinearColors = new[] { Color.FromArgb((int)(255 * on), b.LinearColors[0]), Color.FromArgb((int)(255 * on), b.LinearColors[1]) };
+                    g.FillPath(b, p);
+                    if (!c.Enabled) using (SolidBrush veil = new SolidBrush(Color.FromArgb((int)(140 * on), Theme.Card))) g.FillPath(veil, p);
+                }
+            float d = th - 6 * K, x0 = tr.X + 3 * K, x1 = tr.Right - 3 * K - d, kx = x0 + (x1 - x0) * on;
+            Color knob = !c.Enabled ? Theme.Disabled : Theme.Blend(Theme.Muted, Theme.AccentText, on);
+            using (SolidBrush b = new SolidBrush(knob)) g.FillEllipse(b, kx, tr.Y + 3 * K, d, d);
+            TextRenderer.DrawText(g, c.Text, c.Font, new Rectangle(0, 0, (int)(c.Width - tw - 10 * K), c.Height),
+                                  !c.Enabled ? Theme.Disabled : Theme.Blend(Theme.Muted, Theme.Text, Math.Max(on, hv * 0.6f)),
+                                  TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
+            return;
+        }
+        float box = 18 * K;
         RectangleF r = new RectangleF(0.5f, (c.Height - box) / 2f, box - 1, box - 1);
         if (c.Checked)
         {
-            Color a = c.Enabled ? (hot ? Theme.Blend(Theme.Accent, Theme.Card, 0.15) : Theme.Accent) : Theme.Disabled;
-            Theme.FillRound(g, a, Color.Empty, r, 4, 0);
-            using (Pen p = new Pen(Theme.AccentText, 1.8f))
+            if (c.Enabled) using (GraphicsPath p = Theme.Round(r, 5 * K)) using (LinearGradientBrush b = Theme.AccentBrush(r, hot ? 0.10 : 0)) g.FillPath(b, p);
+            else Theme.FillRound(g, Theme.Disabled, Color.Empty, r, 5 * K, 0);
+            using (Pen p = new Pen(Theme.AccentText, 1.8f * K))
             {
                 p.StartCap = p.EndCap = LineCap.Round;
-                float x = r.X, y = r.Y;
-                g.DrawLines(p, new[] { new PointF(x + 4.5f, y + 9f), new PointF(x + 7.5f, y + 12f), new PointF(x + 13f, y + 5.5f) });
+                float x = r.X, y = r.Y, u = r.Width / 17f;
+                g.DrawLines(p, new[] { new PointF(x + 4.5f * u, y + 9f * u), new PointF(x + 7.5f * u, y + 12f * u), new PointF(x + 13f * u, y + 5.5f * u) });
             }
         }
-        else Theme.FillRound(g, hot ? Theme.ControlHover : Theme.Input, c.Enabled ? Theme.StrokeStrong : Theme.Disabled, r, 4, 1);
-        TextRenderer.DrawText(g, c.Text, c.Font, new Rectangle(box + 8, 0, c.Width - box - 8, c.Height), c.Enabled ? c.ForeColor : Theme.Disabled,
+        else Theme.FillRound(g, hot ? Theme.ControlHover : Theme.Input, c.Enabled ? Theme.StrokeStrong : Theme.Disabled, r, 5 * K, 1);
+        TextRenderer.DrawText(g, c.Text, c.Font, new Rectangle((int)(box + 8 * K), 0, c.Width - (int)(box + 8 * K), c.Height), c.Enabled ? c.ForeColor : Theme.Disabled,
                               TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
     }
 
+    // Buttons with three little dots in the scheme's colours before the text (Themes): they spread a bit on hover.
+    static readonly HashSet<Button> dotted = new HashSet<Button>();
+
+    // Buttons: rounded; the accent one filled with the scheme's gradient, the others raised tiles.
     static void PaintButton(object s, PaintEventArgs e)
     {
         Button b = (Button)s; Graphics g = e.Graphics;
-        g.Clear(b.Parent != null ? b.Parent.BackColor : Theme.Window);
+        Theme.ParentBack(g, b);
+        if (b.Width < 4 || b.Height < 4) return;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        bool hot = b.Enabled && b.ClientRectangle.Contains(b.PointToClient(Control.MousePosition));
-        bool down = hot && (Control.MouseButtons & MouseButtons.Left) != 0;
-        Color acc, fill, border, text = Theme.Text;
-        float bw = 1;
-        if (!b.Enabled) { fill = Theme.ControlOff; border = Theme.Stroke; text = Theme.Disabled; }
-        else if (accents.TryGetValue(b, out acc))
-        {
-            acc = Theme.Tint(acc);
-            fill = Theme.Blend(Theme.Control, acc, down ? 0.30 : hot ? 0.22 : 0.12); border = acc; bw = 1.6f;
-        }
-        else { fill = down ? Theme.ControlPressed : hot ? Theme.ControlHover : Theme.Control; border = Theme.Dark ? Theme.Stroke : Color.FromArgb(255, 0xd6, 0xd6, 0xd6); }
-        RectangleF r = new RectangleF(bw / 2, bw / 2, b.Width - bw - 0.5f, b.Height - bw - 0.5f);
+        float hv = b.Enabled ? Anim.Get(b, 0, 0) : 0;
+        bool down = b.Enabled && b.ClientRectangle.Contains(b.PointToClient(Control.MousePosition)) && (Control.MouseButtons & MouseButtons.Left) != 0;
+        float rad = Math.Min(b.Height / 2f - 1, 12 * Card.K);
+        RectangleF r = new RectangleF(0.5f, 0.5f, b.Width - 1.5f, b.Height - 1.5f);
         if (down) r.Inflate(-0.5f, -0.5f);
-        Theme.FillRound(g, fill, border, r, 5, bw);
-        TextRenderer.DrawText(g, b.Text, b.Font, new Rectangle(4, 0, b.Width - 8, b.Height - (down ? 0 : 1)), text,
+        Color acc, text = Theme.Text;
+        Font font = b.Font;
+        bool isAcc = accents.TryGetValue(b, out acc);
+        if (!b.Enabled) { Theme.FillRound(g, Theme.ControlOff, Theme.Stroke, r, rad, 1); text = Theme.Disabled; }
+        else if (isAcc && acc.IsEmpty)
+        {
+            using (GraphicsPath p = Theme.Round(r, rad))
+            using (LinearGradientBrush br = Theme.AccentBrush(r, down ? -0.12 : 0.12 * hv))
+                g.FillPath(br, p);
+            text = Theme.AccentText; font = Theme.Strong ?? b.Font;
+        }
+        else if (isAcc)
+        {
+            Theme.FillRound(g, Theme.Blend(Theme.Control, acc, down ? 0.30 : 0.12 + 0.10 * hv), acc, r, rad, 1.6f);
+        }
+        else Theme.FillRound(g, down ? Theme.ControlPressed : Theme.Blend(Theme.Control, Theme.ControlHover, hv), Theme.Blend(Theme.Stroke, Theme.StrokeStrong, hv), r, rad, 1);
+        Rectangle tr = new Rectangle(4, 0, b.Width - 8, b.Height - (down ? 0 : 1));
+        if (dotted.Contains(b))
+        {
+            float K = Card.K, d = 9 * K, step = (5.5f + 1.5f * hv) * K, w = d + 2 * step, gap = 7 * K;
+            int tw = TextRenderer.MeasureText(b.Text, font, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width;
+            float x = (b.Width - (w + gap + tw)) / 2f, y = (b.Height - d) / 2f - (down ? 0 : 0.5f);
+            Color[] tones = { Theme.Accent3, Theme.Accent2, Theme.Accent };   // drawn back to front: the accent on top
+            Color edge = down ? Theme.ControlPressed : Theme.Blend(Theme.Control, Theme.ControlHover, hv);
+            for (int i = 0; i < 3; i++)
+            {
+                RectangleF dr = new RectangleF(x + (2 - i) * step, y, d, d);
+                using (SolidBrush br = new SolidBrush(b.Enabled ? tones[i] : Theme.Disabled)) g.FillEllipse(br, dr);
+                using (Pen ring = new Pen(edge, 1.4f * K)) g.DrawEllipse(ring, dr);   // a thin edge so overlapping dots stay apart
+            }
+            TextRenderer.DrawText(g, b.Text, font, new Rectangle((int)(x + w + gap), 0, tw + 4, tr.Height), text,
+                                  TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
+            return;
+        }
+        TextRenderer.DrawText(g, b.Text, font, tr, text,
                               TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
     }
 
@@ -2617,7 +4011,7 @@ class EmuForm : Form
         if (cli != null) return Cli(cli, logFile);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        Theme.Set(Theme.SystemDark());
+        Theme.Set(Core.Cfg.Colors);
         Application.Run(new EmuForm());
         return 0;
     }

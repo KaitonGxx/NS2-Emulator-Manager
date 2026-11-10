@@ -42,6 +42,7 @@ public class Config
     public Dictionary<string, List<string>> ShareMerged { get; set; }    // id -> "its path|shared path" of saves/DLC it added to the shared ones       // id of the emulator whose data all of them use (its card is ticked); null = no sharing
     public List<string> NoSetupReminder { get; set; }   // emulator ids whose card doesn't say "Next: add your keys / firmware"
     public string Window { get; set; }          // main window as the user left it: "x,y,width,height,maximized" (screen pixels)
+    public string Colors { get; set; }          // colour scheme picked in Colors... (an id from Theme.Schemes: purple, ocean, sakura...)
 }
 
 public class Release
@@ -125,14 +126,15 @@ public static class Core
         log("Manager " + r.Tag + " is ready: " + setup);
         return setup;
     }
-    // Naming rule: the upstream repo is "Eglantine Main"; every other build is "<name> (fork)" (an existing
-    // "(... fork)" ending is replaced, so "PokeDinner (Eglantine fork)" -> "PokeDinner (fork)").
+    // Naming rule: the upstream repo is "Eglantine Main"; every other build is just its name. A "(... fork)" ending
+    // (older versions added "(fork)") is dropped, so "PokeDinner (fork)" and "PokeDinner (Eglantine fork)" -> "PokeDinner".
+    // Only the name: the folders keep the names they were made with.
     public static string DisplayName(EmuDef e)
     {
         if (IsMainRepo(e)) return "Eglantine Main";
         string n = Regex.Replace((e.Name ?? "").Trim(), @"\s*\([^()]*\bfork\)\s*$", "", RegexOptions.IgnoreCase).Trim();
         if (n.Length == 0) n = (e.Repo ?? "Build").Split('/').Last();
-        return n + " (fork)";
+        return n;
     }
 
     public static bool IsMainRepo(EmuDef e) { return e.Host == "github" && string.Equals(e.Repo, MAIN_REPO, StringComparison.OrdinalIgnoreCase); }                // no config existed: show the welcome list
@@ -205,11 +207,11 @@ public static class Core
                          Repo = "Djihads80/Eglantine", TagPrefix = "daily-",
                          Assets = new List<string> { "^eglantine-windows-x86_64-pgo\\.zip$", "^eglantine-windows-x86_64\\.zip$" },
                          Dir = Path.Combine(b, "Eglantine Main"), Exe = "eglantine.exe" },
-            new EmuDef { Id = "pokedinner", Name = "PokeDinner (fork)", Note = "Pokopia", Host = "gitea", ApiBase = "https://git.eden-emu.dev/api/v1",
+            new EmuDef { Id = "pokedinner", Name = "PokeDinner", Note = "Pokopia", Host = "gitea", ApiBase = "https://git.eden-emu.dev/api/v1",
                          Repo = "Franseven/PokeDinner-a-Eglantine-Fork", TagPrefix = "",
                          Assets = new List<string> { "(?i)^(?!.*(mac|linux|android|aarch64|arm64|appimage)).*win.*\\.zip$", "(?i)^(?!.*(mac|linux|android|aarch64|arm64|appimage)).*\\.zip$" },
                          Dir = Path.Combine(b, "PokeDinner (fork)"), Exe = "eglantine.exe" },
-            new EmuDef { Id = "lichii", Name = "Lichii (fork)", Note = "Ocarina of Time (OOT)", Host = "github", Repo = "zortos293/Lichii", TagPrefix = "build-",
+            new EmuDef { Id = "lichii", Name = "Lichii", Note = "Ocarina of Time (OOT)", Host = "github", Repo = "zortos293/Lichii", TagPrefix = "build-",
                          Assets = new List<string> { "^lichii-windows-x86_64-pgo\\.zip$" }, Dir = Path.Combine(b, "Lichii (fork)"), Exe = "lichii.exe" },
         };
     }
@@ -636,16 +638,48 @@ public static class Core
     public static readonly TimeSpan CacheFor = TimeSpan.FromMinutes(10);
     // progress(SLOW, 1 = GitHub / 0 = another host): a download attempt failed and is being tried again
     public const long SLOW = -1;
-    static object[] ReleasesJson(string host, string apiBase, string repo, int page, bool fresh = false)
+    static string ReleasesUrl(string host, string apiBase, string repo, int page)
     {
-        string url = host == "gitea"
+        return host == "gitea"
             ? apiBase.TrimEnd('/') + "/repos/" + repo + "/releases?limit=50&page=" + page
             : "https://api.github.com/repos/" + repo + "/releases?per_page=100&page=" + page;
+    }
+    static string CacheFile(string url)
+    {
+        using (SHA1 h = SHA1.Create())
+            return Path.Combine(DataDir, "cache", BitConverter.ToString(h.ComputeHash(Encoding.UTF8.GetBytes(url))).Replace("-", "").ToLowerInvariant() + ".json");
+    }
+    // When e's versions came out, from the release list remembered by the last check (no network; empty when none):
+    // the versions Update would install (its channel), else all of them. For the Updates tile.
+    public static List<DateTime> RecentReleaseDates(EmuDef e)
+    {
+        List<DateTime> l = new List<DateTime>();
+        try
+        {
+            string file = CacheFile(ReleasesUrl(e.Host, e.ApiBase, e.Repo, 1));
+            if (!File.Exists(file)) return l;
+            object[] list = Json.DeserializeObject(File.ReadAllText(file)) as object[];
+            if (list == null) return l;
+            List<Release> chan = Matching(e, list, true);
+            if ((chan == null || chan.Count == 0) && !string.IsNullOrEmpty(e.TagPrefix)) chan = Matching(e, list, false);
+            IEnumerable<string> when = chan != null && chan.Count > 0 ? chan.Select(r => r.Published)
+                : list.OfType<Dictionary<string, object>>().Where(r => S(r, "draft") != "True").Select(r => S(r, "published_at") ?? S(r, "created_at"));
+            foreach (string w in when)
+            {
+                DateTime d = ParseDate(w);
+                if (d > DateTime.MinValue) l.Add(DateTime.SpecifyKind(d, DateTimeKind.Utc).ToLocalTime());
+            }
+        }
+        catch { }
+        return l;
+    }
+    static object[] ReleasesJson(string host, string apiBase, string repo, int page, bool fresh = false)
+    {
+        string url = ReleasesUrl(host, apiBase, repo, page);
         string file = null, text = null;
         try
         {
-            using (SHA1 h = SHA1.Create())
-                file = Path.Combine(DataDir, "cache", BitConverter.ToString(h.ComputeHash(Encoding.UTF8.GetBytes(url))).Replace("-", "").ToLowerInvariant() + ".json");
+            file = CacheFile(url);
             if (!fresh && File.Exists(file) && DateTime.UtcNow - File.GetLastWriteTimeUtc(file) < CacheFor) text = File.ReadAllText(file);
         }
         catch { text = null; }

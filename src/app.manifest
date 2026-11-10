@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Both exes: run as the normal user (never asks for admin), declared for Windows 10 / 11. -->
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
-  <assemblyIdentity version="1.2.19.0" name="Switch2EmulatorManager" type="win32" />
+  <assemblyIdentity version="1.3.4.0" name="Switch2EmulatorManager" type="win32" />
   <description>NS2 Emulator Manager</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>

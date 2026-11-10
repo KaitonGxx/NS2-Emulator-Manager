@@ -1,0 +1,25 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent;overflow:hidden}svg{display:block}</style></head><body>
+<script>
+// The flower ball (PokeDinner) inside a dark ring. f: flower size; clip: tuck the petal tips under the ring.
+const q = new URLSearchParams(location.search);
+const f = +(q.get('f') || 0.735), clip = q.get('clip') === '1';
+const dark = '#1d1530';
+const whiten = '<filter id="white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0.14 0.14 0.14 0 0.62  0.14 0.14 0.14 0 0.60  0.14 0.14 0.14 0 0.62  0 0 0 1 0"/></filter>';
+// the ball's centre in the flower art (256 px) is (120,133): move it to the middle of the ring
+const tx = 128 - 120 * f, ty = 128 - 133 * f;
+const ball = `
+    <image href="flower-orig.png" width="256" height="256" clip-path="url(#top)"/>
+    <image href="flower-orig.png" width="256" height="256" clip-path="url(#bot)" filter="url(#white)"/>
+    <g mask="url(#m)"><rect x="0" y="126" width="256" height="14" fill="${dark}"/></g>
+    <circle cx="120" cy="133" r="27" fill="${dark}"/><circle cx="120" cy="133" r="16" fill="#fff"/>`;
+document.body.innerHTML = `<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>${whiten}
+    <clipPath id="top"><rect x="0" y="0" width="256" height="133"/></clipPath>
+    <clipPath id="bot"><rect x="0" y="133" width="256" height="123"/></clipPath>
+    <mask id="m" style="mask-type:alpha"><image href="flower-orig.png" width="256" height="256"/></mask>
+    <clipPath id="ring"><circle cx="128" cy="128" r="116"/></clipPath>
+  </defs>
+  <g ${clip ? 'clip-path="url(#ring)"' : ''}><g transform="translate(${tx} ${ty}) scale(${f})">${ball}</g></g>
+  <circle cx="128" cy="128" r="120" fill="none" stroke="${dark}" stroke-width="11"/>
+</svg>`;
+</script></body></html>

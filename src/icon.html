@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent;overflow:hidden}svg{display:block}</style></head>
+<body><script>
+// The manager's icon: a simple outline of the console (a screen with a controller on each side). make_icon.py draws it
+// with Edge at each size: icon.html?size=N&tile=0|1
+//   tile=0 (the app icon: desktop, Start, taskbar): the console alone, as big as the icon, with a thin dark edge so it
+//          shows on light wallpapers too
+//   tile=1 (the logo in the window's header): the console on the purple gradient tile
+// From 32 px it is drawn as shapes, with sticks, D-pad and buttons (bolder below 64 px, so a 48 px desktop icon still
+// shows them). Below 32 px (taskbar, title bar, Start list, small icons) it is pixel art: every edge on a whole pixel,
+// a 1 px dark outline, the screen, a 3 px D-pad and four button dots (and single-pixel sticks at 24 px).
+const q = new URLSearchParams(location.search);
+const size = +(q.get('size') || 256), tile = q.get('tile') !== '0';
+const purple = '#a46cf6', pink = '#d76be0', dark = '#1d1530';
+let s;
+if (!tile && size < 32 && size % 4 === 0) {
+  // pixel art: the console is N/2 tall, each controller N/4 wide (16 px: 8 tall, 4 wide)
+  const N = size, H = N / 2, cw = N / 4, y0 = N / 4, px = [];
+  const box = (x, y, w, h, c) => px.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`);
+  box(0, y0, N, H, dark);                                   // outline
+  box(1, y0 + 1, N - 2, H - 2, '#fff');                     // white body and controllers
+  box(cw, y0 + 1, 1, H - 2, dark); box(N - 1 - cw, y0 + 1, 1, H - 2, dark);   // the seams between them
+  box(cw + 2, y0 + 2, N - 2 * cw - 4, H - 4, dark);         // the screen, inside a 1 px white edge
+  const dx = Math.floor(cw / 2), bx = N - 1 - dx, dy = y0 + H / 2, by = dy - 1;
+  box(dx - 1, dy, 3, 1, purple); box(dx, dy - 1, 1, 3, purple);            // D-pad
+  for (const [ox, oy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) box(bx + ox, by + oy, 1, 1, pink);   // buttons
+  if (N >= 24) { box(dx, y0 + 2, 1, 1, purple); box(bx, y0 + H - 3, 1, 1, pink); }                 // sticks
+  // rounded outer corners
+  const clear = [[0, y0], [N - 1, y0], [0, y0 + H - 1], [N - 1, y0 + H - 1]];
+  s = `<svg width="${N}" height="${N}" viewBox="0 0 ${N} ${N}" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
+<defs><mask id="m"><rect width="${N}" height="${N}" fill="#fff"/>${clear.map(c => `<rect x="${c[0]}" y="${c[1]}" width="1" height="1" fill="#000"/>`).join('')}</mask></defs>
+<g mask="url(#m)">${px.join('')}</g></svg>`;
+} else {
+  const bold = size < 64;
+  // without the tile the console fills the icon: 50 units wide -> 62
+  const grow = tile ? 1 : 62 / 50;
+  const edge = tile ? '' : ` stroke="${dark}" stroke-width="${size >= 48 ? 2.4 : 2.0}" stroke-linejoin="round" paint-order="stroke"`;
+  s = `<svg width="${size}" height="${size}" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9b6bff"/><stop offset="1" stop-color="#e66bd6"/></linearGradient></defs>`;
+  if (tile) s += `<rect x="2" y="2" width="60" height="60" rx="16" fill="url(#g)"/>`;
+  s += `<g transform="translate(32 32) scale(${grow}) translate(-32 -32)">
+<path d="M16.5 20H12a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h4.5z" fill="#fff"${edge}/>
+<path d="M47.5 20H52a5 5 0 0 1 5 5v14a5 5 0 0 1-5 5h-4.5z" fill="#fff"${edge}/>
+<rect x="17.5" y="20" width="29" height="24" rx="1.2" fill="#fff"${edge}/>
+<rect x="19.6" y="22.2" width="24.8" height="19.6" rx="1" fill="${dark}"/>
+<circle cx="11.8" cy="26.5" r="2.4" fill="${purple}"/><circle cx="52.2" cy="37.5" r="2.4" fill="${pink}"/>`;
+  // D-pad under the left stick, four buttons above the right one; arm length a, thickness w, button radius r, spacing o
+  const a = bold ? 6.4 : 5, w = bold ? 2.2 : 1.5, r = bold ? 1.4 : 1.05, o = bold ? 2.35 : 2.05, cx = 11.8, cy = 37.3, bx = 52.2, by = 26.5;
+  s += `
+<rect x="${cx - a / 2}" y="${cy - w / 2}" width="${a}" height="${w}" rx="${w * 0.3}" fill="${purple}"/>
+<rect x="${cx - w / 2}" y="${cy - a / 2}" width="${w}" height="${a}" rx="${w * 0.3}" fill="${purple}"/>
+<circle cx="${bx}" cy="${by - o}" r="${r}" fill="${pink}"/><circle cx="${bx}" cy="${by + o}" r="${r}" fill="${pink}"/>
+<circle cx="${bx - o}" cy="${by}" r="${r}" fill="${pink}"/><circle cx="${bx + o}" cy="${by}" r="${r}" fill="${pink}"/>
+</g></svg>`;
+}
+document.body.innerHTML = s;
+</script></body></html>

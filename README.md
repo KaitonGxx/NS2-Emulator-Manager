@@ -65,6 +65,8 @@ python manager.py build        # builds EmuManager.exe
 python manager.py installer    # builds dist\NS2EmulatorManager.zip (Setup.exe + EmuManager.exe)
 ```
 
+The icon is drawn from `src\icon.html`. To redraw it, run `python src\make_icon.py`, which needs Microsoft Edge and Pillow.
+
 ## Credits
 
 - The emulators are made and hosted by their own projects:
@@ -72,7 +74,8 @@ python manager.py installer    # builds dist\NS2EmulatorManager.zip (Setup.exe +
   [PokeDinner](https://git.eden-emu.dev/Franseven/PokeDinner-a-Eglantine-Fork),
   [Lichii](https://github.com/zortos293/Lichii).
   This tool only downloads their official releases.
-- The app icon is based on Eglantine's flower logo.
+- The emulator logos on the cards belong to their projects: Eglantine's flower (PokeDinner's badge adds a ball to it)
+  and Lichii's lychee from [lichii.org](https://lichii.org/).
 
 ## License
 

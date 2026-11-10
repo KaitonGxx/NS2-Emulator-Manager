@@ -836,18 +836,21 @@ public static class UserData
     }
 
     // How many games have saves in a "...\nand\user\save" folder (each game counted once, whatever the profile).
-    public static int CountGames(string saveDir)
+    public static int CountGames(string saveDir) { return GamesIn(saveDir).Count; }
+
+    // The games (title ids) with saves in a "...\nand\user\save" folder.
+    public static HashSet<string> GamesIn(string saveDir)
     {
+        HashSet<string> games = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
             string root = Path.Combine(saveDir ?? "", "0000000000000000");
-            if (!Directory.Exists(root)) return 0;
-            HashSet<string> games = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!Directory.Exists(root)) return games;
             foreach (string p in Directory.GetDirectories(root))
                 foreach (string g in Directory.GetDirectories(p)) if (HasFiles(g)) games.Add(Path.GetFileName(g));
-            return games.Count;
         }
-        catch { return 0; }
+        catch { }
+        return games;
     }
 
     // Saves kept in the backup folder (Shared data\Set aside), newest first: (whose, folder, when).
