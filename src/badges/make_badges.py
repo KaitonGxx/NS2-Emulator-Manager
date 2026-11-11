@@ -1,7 +1,7 @@
 """Makes the built-in emulators' card logos (src\\badges\\<id>.png, 256 px) from the art in src\\badges\\source:
   eglantine.png   Eglantine's flower (source\\flower.png, from Eglantine's dist\\Eglantine.png)
   pokedinner.png  the flower as a ball inside a ring (source\\pokedinner.html, drawn with Edge)
-  lichii.png      Lichii's lychee (source\\lichii.png, from lichii.org)
+  lichii.png      Lichii's lychee (source\\lichii.png)
 The flower's see-through lines between the petals and its centre are only a few pixels wide; on a 32 px card badge they
 would blur away into white. They are widened here (the petals' colours stay as they are) so the badge colour shows
 through at that size, as in Eglantine's own icon.

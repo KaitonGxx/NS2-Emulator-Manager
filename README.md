@@ -75,7 +75,7 @@ The icon is drawn from `src\icon.html`. To redraw it, run `python src\make_icon.
   [Lichii](https://github.com/zortos293/Lichii).
   This tool only downloads their official releases.
 - The emulator logos on the cards belong to their projects: Eglantine's flower (PokeDinner's badge adds a ball to it)
-  and Lichii's lychee from [lichii.org](https://lichii.org/).
+  and Lichii's lychee.
 
 ## License
 
