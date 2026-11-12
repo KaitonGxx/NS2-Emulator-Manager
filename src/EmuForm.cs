@@ -1844,7 +1844,7 @@ class EmuForm : Form
     static string BuiltInId(EmuDef d)
     {
         foreach (EmuDef r in Core.Recommended(Core.Home))
-            if (r.Id == d.Id || d.Host == r.Host && string.Equals(d.Repo, r.Repo, StringComparison.OrdinalIgnoreCase)) return r.Id;
+            if (r.Id == d.Id || Core.SameRepo(d.Host, d.Repo, r.Host, r.Repo)) return r.Id;
         return null;
     }
     static string IconFile(EmuDef d) { return Path.Combine(Core.DataDir, "icons", SafeName(d.Id ?? d.Name ?? "emulator") + ".png"); }
@@ -1979,7 +1979,7 @@ class EmuForm : Form
     }
 
     // One emulator tile at (x, y), width w. h > 0: that height (the row's), with the buttons at the bottom.
-    // Returns the height the tile needs.
+    // h == 0: only measures (nothing at the bottom moves, the tile keeps its size). Returns the height the tile needs.
     int LayoutCard(EmuCard c, int x, int y, int w, int h)
     {
         int P = D(18), iw = w - 2 * P, chipH = D(26), bh = D(40), L = P - D(3);   // L: labels (their text starts a little in)
@@ -2012,6 +2012,9 @@ class EmuForm : Form
         c.Share.Visible = Installed(c.Def) && UserData.IsPortable(c.Def);
         int low = bh + (c.Share.Visible ? D(30) + D(10) : 0) + (c.Existing.Visible ? D(22) + D(10) : 0);
         int natural = ly + D(14) + low + P;
+        // measuring only: placing the buttons at this height and then at the row's would make them jump on every
+        // layout (a download's progress lays out again many times a second)
+        if (h <= 0) return natural;
         h = Math.Max(h, natural);
 
         // bottom: [Launch        ][Update][...]   or   [Install          ][...]
@@ -2969,92 +2972,119 @@ class EmuForm : Form
     }
 
     // ---- forks: add one from a repository link, or take one off the list
+    // The link is looked up as soon as it's pasted (or typed and Enter pressed). Everything is on one page: the name,
+    // which releases, the Windows file (by its name on the release page) and the folder.
     void AddFork()
     {
         if (IsBusy) { PleaseWait(); return; }
         Core.RepoInfo info = null;
         using (Form f = new Form())
+        using (System.Windows.Forms.Timer soon = new System.Windows.Forms.Timer())
         {
             f.Text = "Add from link"; f.FormBorderStyle = FormBorderStyle.FixedDialog; f.MinimizeBox = f.MaximizeBox = false; f.ShowInTaskbar = false;
             f.StartPosition = FormStartPosition.CenterParent; f.Font = Font; f.BackColor = Theme.Window; f.ForeColor = Theme.Text;
-            Func<string, int, Label> lab = (t, yy) => { Label l = new Label(); l.Text = t; l.SetBounds(D(16), yy, D(568), D(20)); l.ForeColor = Theme.Text; f.Controls.Add(l); return l; };
-            Func<int, int, int, TextBox> box = (xx, yy, ww) => { TextBox t = new TextBox(); t.SetBounds(xx, yy, ww, D(24)); t.BackColor = Theme.Input; t.ForeColor = Theme.Text; t.BorderStyle = BorderStyle.FixedSingle; f.Controls.Add(t); return t; };
-            Func<int, ComboBox> combo = yy => { ComboBox c = new ComboBox(); c.DropDownStyle = ComboBoxStyle.DropDownList; c.SetBounds(D(16), yy, D(568), D(26)); c.BackColor = Theme.Input; c.ForeColor = Theme.Text; c.Enabled = false; DarkCombo(c); f.Controls.Add(c); return c; };
+            int W = D(600), pad = D(16), cw = W - 2 * pad, iw = cw - D(28);   // card width, width inside a card
+            Label title = new Label(); title.Text = "Add from link"; title.Font = Theme.CardTitle; title.SetBounds(pad, D(14), cw, D(28)); f.Controls.Add(title);
+            Label intro = new Label(); intro.Text = "Paste a GitHub or Gitea link to an emulator. It's found right away."; intro.ForeColor = Theme.Muted; intro.SetBounds(pad, D(46), cw, D(22)); f.Controls.Add(intro);
+            Func<int, int, Card> card = (yy, hh) => { Card c = new Card(); c.Text = ""; c.Shift = 0; c.SetBounds(pad, yy, cw, hh); f.Controls.Add(c); return c; };
+            Func<Control, string, int, Label> lab = (p, t, yy) => { Label l = new Label(); l.Text = t; l.SetBounds(D(14), yy, iw, D(20)); l.ForeColor = Theme.Muted; l.BackColor = Theme.Card; p.Controls.Add(l); return l; };
+            Func<Control, int, int, TextBox> box = (p, yy, ww) => { TextBox t = new TextBox(); t.SetBounds(D(14), yy, ww, D(26)); t.BackColor = Theme.Input; t.ForeColor = Theme.Text; t.BorderStyle = BorderStyle.FixedSingle; p.Controls.Add(t); return t; };
+            Func<Control, int, ComboBox> combo = (p, yy) => { ComboBox c = new ComboBox(); c.DropDownStyle = ComboBoxStyle.DropDownList; c.SetBounds(D(14), yy, iw, D(26)); c.BackColor = Theme.Input; c.ForeColor = Theme.Text; c.Enabled = false; DarkCombo(c); p.Controls.Add(c); return c; };
 
-            lab("Paste the emulator's web link:", D(12));
-            TextBox url = box(D(16), D(34), D(458));
-            Button look = new Button(); look.Text = "Find"; look.SetBounds(D(482), D(32), D(102), D(30)); f.Controls.Add(look);
-            Label status = lab("", D(64)); status.ForeColor = Theme.Muted; status.AutoEllipsis = true;
-            lab("Name", D(92)); TextBox name = box(D(16), D(112), D(568));
-            lab("Best for (optional)", D(142)); TextBox note = box(D(16), D(162), D(568));
-            LinkLabel adv = new LinkLabel(); adv.Text = "Advanced"; adv.SetBounds(D(16), D(196), D(120), D(20)); adv.LinkColor = adv.ActiveLinkColor = adv.VisitedLinkColor = Theme.Accent; adv.LinkBehavior = LinkBehavior.HoverUnderline; f.Controls.Add(adv);
-            List<Control> advanced = new List<Control>();
-            int c0 = f.Controls.Count;
-            lab("Which releases", D(224)); ComboBox chan = combo(D(244));
-            lab("Windows version", D(276)); ComboBox kind = combo(D(296));
-            lab("Install folder", D(328)); TextBox dir = box(D(16), D(348), D(458));
-            Button browse = new Button(); browse.Text = "Browse..."; browse.SetBounds(D(482), D(346), D(102), D(30)); f.Controls.Add(browse);
-            for (int i = c0; i < f.Controls.Count; i++) advanced.Add(f.Controls[i]);
-            Label warn = lab("", D(224)); warn.SetBounds(D(16), D(224), D(568), D(36)); warn.ForeColor = Theme.Muted;
-            Button ok = new Button(); ok.Text = "Install"; ok.Enabled = false; f.Controls.Add(ok);
-            Button no = new Button(); no.Text = "Cancel"; no.DialogResult = DialogResult.Cancel; f.Controls.Add(no);
-            Action place = () =>
-            {
-                bool a = advanced[0].Visible;
-                int wy = a ? D(380) : D(224);
-                warn.SetBounds(D(16), wy, D(568), D(36));
-                ok.SetBounds(D(388), wy + D(42), D(96), D(34)); no.SetBounds(D(490), wy + D(42), D(94), D(34));
-                f.ClientSize = new Size(D(600), wy + D(42) + D(34) + D(16));
-            };
-            foreach (Control a0 in advanced) a0.Visible = false;
-            place();
-            adv.LinkClicked += delegate { bool v = !advanced[0].Visible; foreach (Control a0 in advanced) a0.Visible = v; adv.Text = v ? "Hide advanced" : "Advanced"; place(); };
-            f.AcceptButton = look; f.CancelButton = no;
-            foreach (Button b in new[] { look, browse, ok, no }) { StyleButton(b); b.BackColor = Theme.Window; }
+            int y = D(78);
+            Card linkCard = card(y, D(94));
+            lab(linkCard, "Link", D(10));
+            TextBox url = box(linkCard, D(32), iw);
+            const string HINT = "For example https://github.com/owner/emulator";
+            Label status = new Label(); status.SetBounds(D(14), D(64), iw, D(22)); status.AutoEllipsis = true; status.BackColor = Theme.Card; status.ForeColor = Theme.Muted; status.Text = HINT; linkCard.Controls.Add(status);
+            y += D(94) + D(10);
+            Card nameCard = card(y, D(130));
+            lab(nameCard, "Name", D(10)); TextBox name = box(nameCard, D(32), iw);
+            lab(nameCard, "Best for (optional)", D(68)); TextBox note = box(nameCard, D(90), iw);
+            y += D(130) + D(10);
+            Card moreCard = card(y, D(194));
+            lab(moreCard, "Which releases", D(10)); ComboBox chan = combo(moreCard, D(32));
+            lab(moreCard, "Windows version", D(68)); ComboBox kind = combo(moreCard, D(90));
+            lab(moreCard, "Install folder", D(126)); TextBox dir = box(moreCard, D(148), iw - D(110));
+            Button browse = new Button(); browse.Text = "Browse..."; browse.SetBounds(D(14) + iw - D(102), D(146), D(102), D(30)); moreCard.Controls.Add(browse);
+            y += D(194) + D(8);
+            Label warn = new Label(); warn.SetBounds(pad, y, cw, D(36)); warn.ForeColor = Theme.Muted; f.Controls.Add(warn);
+            y += D(40);
+            Button ok = new Button(); ok.Text = "Install"; ok.Enabled = false; ok.SetBounds(W - D(250), y, D(118), D(36)); f.Controls.Add(ok);
+            Button no = new Button(); no.Text = "Cancel"; no.DialogResult = DialogResult.Cancel; no.SetBounds(W - D(124), y, D(108), D(36)); f.Controls.Add(no);
+            f.ClientSize = new Size(W, y + D(52));
+            f.CancelButton = no;
+            foreach (Button b in new[] { browse, ok, no }) { StyleButton(b); b.BackColor = b == browse ? Theme.Card : Theme.Window; }
             Outline(ok, Theme.Accent);
             f.HandleCreated += delegate
             {
                 Native.Apply(f.Handle, Theme.Dark, 0);
-                foreach (Control c in f.Controls) if (c is ComboBox || c is TextBox) Native.ControlTheme(c.Handle, Theme.Dark ? (c is ComboBox ? "DarkMode_CFD" : "DarkMode_Explorer") : "Explorer");
+                foreach (Control c in new Control[] { url, name, note, dir, chan, kind }) Native.ControlTheme(c.Handle, Theme.Dark ? (c is ComboBox ? "DarkMode_CFD" : "DarkMode_Explorer") : "Explorer");
             };
 
             string root = Core.Home;   // like the recommended builds: <install folder>\<name> (always inside a test environment)
-            bool dirTouched = false;
+            bool dirTouched = false, nameTouched = false;
+            string autoNote = "";   // the note filled in for a recommended emulator: replaced when the link changes, a typed one never
             dir.TextChanged += delegate { if (dir.Focused) dirTouched = true; };
+            name.TextChanged += delegate { if (name.Focused) nameTouched = true; };
+            // a name no other emulator has ("Eglantine Main 2" for a second Eglantine)
+            Func<string, string> freeName = n0 =>
+            {
+                string n = n0;
+                for (int k = 2; Core.Cfg.Emulators.Any(x => string.Equals(x.Name, n, StringComparison.OrdinalIgnoreCase)); k++) n = n0 + " " + k;
+                return n;
+            };
+            // <install folder>\<name>, or "<name> 2"... when that folder belongs to another emulator or already has files
+            Func<string, string> freeDir = n0 =>
+            {
+                string b0 = Path.Combine(root, SafeName(n0)), d = b0;
+                for (int k = 2; k < 100; k++)
+                {
+                    string full = Path.GetFullPath(d).TrimEnd('\\');
+                    if (Core.FolderProblem(new EmuDef(), full) == null && !(Directory.Exists(full) && Directory.EnumerateFileSystemEntries(full).Any())) break;
+                    d = b0 + " " + k;
+                }
+                return d;
+            };
             EventHandler checkDir = delegate
             {
-                string d0 = dir.Text.Trim(), why = null;
+                string d0 = dir.Text.Trim(), why = null, n = Core.DisplayName(new EmuDef { Name = name.Text.Trim() });
                 warn.Text = "";
-                if (d0.Length == 0 || !Path.IsPathRooted(d0)) why = "Choose an install folder (Advanced).";
+                if (info != null && Core.Cfg.Emulators.Any(x => string.Equals(x.Name, n, StringComparison.OrdinalIgnoreCase)))
+                    why = "Another emulator is already called " + n + ". Choose another name.";
+                else if (d0.Length == 0 || !Path.IsPathRooted(d0)) why = "Choose an install folder.";
                 else
                 {
                     string full = "";
-                    try { full = Path.GetFullPath(d0).TrimEnd('\\'); } catch { why = "This folder can't be used. Choose another one (Advanced)."; }
+                    try { full = Path.GetFullPath(d0).TrimEnd('\\'); } catch { why = "This folder can't be used. Choose another one."; }
                     if (why == null)
                     {
                         string bad = Core.FolderProblem(new EmuDef(), full);   // other builds, manager folders, test-environment bounds
                         if (bad == null && string.Equals(full, Path.GetFullPath(root).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) bad = "the install folder itself";
-                        if (bad != null) { why = "This folder can't be used. Choose another one (Advanced)."; tips.SetToolTip(warn, bad); }
+                        if (bad != null) { why = "This folder can't be used. Choose another one."; tips.SetToolTip(warn, bad); }
                         else if (Directory.Exists(full) && Directory.EnumerateFileSystemEntries(full).Any()) warn.Text = "This folder isn't empty.";
                     }
                 }
                 if (why != null) warn.Text = why;
                 warn.ForeColor = why != null ? Theme.Danger : Theme.Muted;
-                ok.Enabled = info != null && why == null && name.Text.Trim().Length > 0;
+                ok.Enabled = info != null && why == null && name.Text.Trim().Length > 0 && kind.SelectedIndex >= 0;
             };
             dir.TextChanged += checkDir; name.TextChanged += checkDir;
-            name.TextChanged += delegate { if (!dirTouched && info != null) dir.Text = Path.Combine(root, SafeName(Core.DisplayName(new EmuDef { Name = name.Text.Trim(), Host = info.Host, Repo = info.Repo }))); };
+            name.TextChanged += delegate { if (!dirTouched && info != null && name.Text.Trim().Length > 0) dir.Text = freeDir(Core.DisplayName(new EmuDef { Name = name.Text.Trim() })); };
             browse.Click += delegate
             {
                 string picked = FolderPicker.Pick(f, "Choose an empty folder for this emulator", Directory.Exists(dir.Text) ? dir.Text : (Directory.Exists(root) ? root : Core.Home));
                 if (picked != null) { dirTouched = true; dir.Text = picked; }
             };
-            look.Click += delegate
+
+            // looking the link up: each change starts over, and only the answer for the current text counts
+            int gen = 0;
+            Action find = () =>
             {
                 string link = url.Text.Trim();
                 if (link.Length == 0) return;
-                look.Enabled = false; ok.Enabled = false; info = null;
-                status.ForeColor = Theme.Muted; status.Text = "Looking...";
+                int my = ++gen;
+                status.ForeColor = Theme.Muted; status.Text = "Looking..."; tips.SetToolTip(status, null);
                 ThreadPool.QueueUserWorkItem(delegate
                 {
                     Core.RepoInfo ri = null; string err = null;
@@ -3063,30 +3093,53 @@ class EmuForm : Form
                     {
                         f.BeginInvoke((MethodInvoker)delegate
                         {
-                            look.Enabled = true;
+                            if (my != gen) return;   // the link changed meanwhile
                             if (err != null) { Log("Add from link: " + link + ": " + err); status.ForeColor = Theme.Danger; status.Text = "Nothing found at that link. Check it and try again."; tips.SetToolTip(status, err); return; }
-                            EmuDef dup = Core.Cfg.Emulators.FirstOrDefault(x => string.Equals(x.Repo, ri.Repo, StringComparison.OrdinalIgnoreCase) && x.Host == ri.Host);
+                            EmuDef dup = Core.Cfg.Emulators.FirstOrDefault(x => Core.SameRepo(x.Host, x.Repo, ri.Host, ri.Repo));
+                            EmuDef rec = Core.Recommended(Core.Home).FirstOrDefault(r => Core.SameRepo(r.Host, r.Repo, ri.Host, ri.Repo));
                             info = ri;
                             Log("Add from link: " + ri.Repo + ", " + ri.Channels.Sum(c => c.Count) + " Windows releases.");
                             status.ForeColor = dup != null ? Theme.Warn : Theme.Success;
-                            status.Text = dup != null ? "Already on your list as " + dup.Name + "." : "Found " + ri.Name + ".";
+                            status.Text = dup != null ? "Already on your list as " + dup.Name + ". Choose another Windows version below." : "Found " + ri.Name + ".";
                             chan.Items.Clear();
                             chan.Items.Add("All releases (newest: " + ri.Channels[0].Newest + ")");
                             foreach (Core.Channel c in ri.Channels)
                                 if (c.Prefix.Length > 0)
                                     chan.Items.Add(c.Prefix + "*   " + c.Count + " release" + (c.Count == 1 ? "" : "s") + ", newest " + c.Newest + " (" + Core.ParseDate(c.NewestDate).ToLocalTime().ToString("yyyy-MM-dd") + ")");
                             List<Core.Channel> named = ri.Channels.Where(c => c.Prefix.Length > 0).ToList();
-                            int sel = named.FindIndex(c => c.Prefix == ri.DefaultPrefix);
-                            chan.SelectedIndex = ri.DefaultPrefix.Length > 0 && sel >= 0 ? sel + 1 : 0;
+                            // the channel the one already on the list (or the recommended one) follows, else the busiest
+                            string want = dup != null ? dup.TagPrefix ?? "" : rec != null ? rec.TagPrefix ?? "" : ri.DefaultPrefix;
+                            if ((dup != null || rec != null) && want.Length > 0 && !named.Any(c => string.Equals(c.Prefix, want, StringComparison.OrdinalIgnoreCase))) want = ri.DefaultPrefix;
+                            int sel = named.FindIndex(c => string.Equals(c.Prefix, want, StringComparison.OrdinalIgnoreCase));
+                            chan.SelectedIndex = want.Length > 0 && sel >= 0 ? sel + 1 : 0;
                             chan.Tag = named;
+                            // the Windows files of the newest release, named as on its release page; the PGO one first
+                            // when there is one (faster), unless that one is already on the list
                             kind.Items.Clear();
-                            if (ri.HasPgo) kind.Items.Add("Faster version (recommended)");
-                            kind.Items.Add("Standard version");
-                            kind.SelectedIndex = 0;
+                            foreach (string z in ri.Zips) kind.Items.Add(z);
+                            int pick = ri.Zips.FindIndex(z => z.IndexOf("pgo", StringComparison.OrdinalIgnoreCase) >= 0);
+                            if (dup != null)
+                            {   // the file the one on the list uses (its installed build, else its newest release)
+                                Manifest mf = string.IsNullOrEmpty(dup.Dir) ? null : Core.LoadManifest(dup.Dir);
+                                EmuCard dc = cards.FirstOrDefault(k => k.Def == dup);
+                                string have = mf != null && !string.IsNullOrEmpty(mf.Asset) ? mf.Asset : dc != null && dc.Rel != null ? dc.Rel.Asset : null;
+                                // a second copy is usually the other kind (DLSS needs the non-PGO build): PGO <-> not
+                                bool havePgo = have != null ? have.IndexOf("pgo", StringComparison.OrdinalIgnoreCase) >= 0
+                                             : dup.Assets != null && dup.Assets.Count > 0 && (dup.Assets[0].IndexOf("(?=.*pgo)", StringComparison.OrdinalIgnoreCase) >= 0   // older versions' PGO pattern
+                                                 || dup.Assets[0].IndexOf("pgo", StringComparison.OrdinalIgnoreCase) >= 0 && dup.Assets[0].IndexOf("(?!.*pgo)", StringComparison.OrdinalIgnoreCase) < 0 && dup.Assets[0].IndexOf("?!", StringComparison.Ordinal) < 0);
+                                int other = ri.Zips.FindIndex(z => (z.IndexOf("pgo", StringComparison.OrdinalIgnoreCase) >= 0) != havePgo);
+                                if (other >= 0) pick = other;
+                            }
+                            kind.SelectedIndex = pick >= 0 ? pick : 0;
                             Log("Add from link: Windows files in " + ri.ZipsFrom + ": " + string.Join(", ", ri.Zips));
                             chan.Enabled = kind.Enabled = true;
-                            if (name.Text.Trim().Length == 0 || !dirTouched) name.Text = ri.Name;
-                            if (!dirTouched) dir.Text = Path.Combine(root, SafeName(Core.DisplayName(new EmuDef { Name = name.Text.Trim(), Host = ri.Host, Repo = ri.Repo })));
+                            if (!nameTouched || name.Text.Trim().Length == 0)
+                            {
+                                name.Text = freeName(dup != null ? dup.Name : rec != null ? rec.Name : ri.Name);
+                            }
+                            string cur = note.Text.Trim();
+                            if (cur.Length == 0 || cur == autoNote) { autoNote = rec != null && dup == null ? (rec.Note ?? "") : ""; note.Text = autoNote; }
+                            if (!dirTouched) dir.Text = freeDir(Core.DisplayName(new EmuDef { Name = name.Text.Trim() }));
                             checkDir(null, EventArgs.Empty);
                             f.AcceptButton = ok;
                         });
@@ -3094,33 +3147,57 @@ class EmuForm : Form
                     catch { }   // dialog closed meanwhile
                 });
             };
+            soon.Interval = 500;
+            soon.Tick += delegate { soon.Stop(); find(); };
+            url.TextChanged += delegate
+            {
+                soon.Stop(); gen++;   // an answer for the old text no longer counts
+                info = null; ok.Enabled = false; f.AcceptButton = null; chan.Enabled = kind.Enabled = false;
+                string t = url.Text.Trim();
+                // a link (host/owner/repo) is looked up once typing stops; anything else waits
+                if (System.Text.RegularExpressions.Regex.IsMatch(t, @"^(?:[a-z+]+://|git@)?[^\s/:]+\.[^\s/:]+(?::\d+)?[/:][^\s/]+/[^\s/#?]+", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) { status.ForeColor = Theme.Muted; status.Text = "Looking..."; soon.Start(); }
+                else { status.ForeColor = Theme.Muted; status.Text = t.Length == 0 ? HINT : "Paste the whole link, like " + HINT.Substring(12) + "."; tips.SetToolTip(status, null); }
+                checkDir(null, EventArgs.Empty);
+            };
+            url.KeyDown += delegate (object s0, KeyEventArgs k) { if (k.KeyCode == Keys.Enter && info == null) { k.SuppressKeyPress = true; soon.Stop(); find(); } };
+            kind.SelectedIndexChanged += checkDir;
             ok.Click += delegate { f.DialogResult = DialogResult.OK; f.Close(); };
+            f.Shown += delegate
+            {
+                url.Focus();
+                // a link already copied: fill it in, it's looked up at once
+                try { string clip = Clipboard.ContainsText() ? Clipboard.GetText().Trim() : ""; if (clip.Length < 300 && System.Text.RegularExpressions.Regex.IsMatch(clip, @"^(https?://)?(www\.)?github\.com/[^\s/]+/[^\s/]+", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) { url.Text = clip; url.SelectAll(); } } catch { }
+            };
             if (f.ShowDialog(this) != DialogResult.OK || info == null) return;
 
             List<Core.Channel> chans = (List<Core.Channel>)chan.Tag;
+            string zip = kind.SelectedItem as string ?? "";
             EmuDef e = new EmuDef();
-            e.Name = name.Text.Trim(); e.Note = note.Text.Trim();
+            e.Name = Core.DisplayName(new EmuDef { Name = name.Text.Trim(), Repo = info.Repo }); e.Note = note.Text.Trim();
             e.Host = info.Host; e.ApiBase = info.ApiBase; e.Repo = info.Repo;
-            e.Name = Core.DisplayName(e);   // its name, or "Eglantine Main" for the upstream repo
             e.TagPrefix = chan.SelectedIndex > 0 ? chans[chan.SelectedIndex - 1].Prefix : "";
-            e.Assets = Core.AssetPatterns(info.HasPgo && kind.SelectedIndex == 0);
+            // the chosen file by name (its version parts may change), then the same kind of file if a release names it differently
+            bool pgo = zip.IndexOf("pgo", StringComparison.OrdinalIgnoreCase) >= 0;
+            e.Assets = new List<string>();
+            if (zip.Length > 0) e.Assets.Add(Core.AssetPattern(zip));
+            e.Assets.AddRange(Core.AssetPatterns(pgo));
             e.Dir = Path.GetFullPath(dir.Text.Trim()).TrimEnd('\\');
             e.Exe = ""; e.Added = true;
             string id = SafeName(info.Repo.Replace('/', '-')).ToLowerInvariant().Replace(' ', '-');
-            string baseId = id; int n = 2;
+            string baseId = id; int idn = 2;
             // a removed fork's previous builds / downloads stay under its id: never reuse one
-            while (Core.IdTaken(id)) id = baseId + "-" + n++;
+            while (Core.IdTaken(id)) id = baseId + "-" + idn++;
             e.Id = id;
             Core.Cfg.Emulators.Add(e);
             try { Core.SaveConfig(); }
             catch (Exception ex) { Core.Cfg.Emulators.Remove(e); Log("Could not save the new fork: " + ex.Message); return; }
-            Log("Added " + e.Name + " (" + info.WebUrl + ", channel " + (e.TagPrefix.Length > 0 ? e.TagPrefix + "*" : "all") + ") -> " + e.Dir);
-            EmuCard card = MakeCard(e);
-            cards.Add(card);
+            Log("Added " + e.Name + " (" + info.WebUrl + ", channel " + (e.TagPrefix.Length > 0 ? e.TagPrefix + "*" : "all") + ", " + (zip.Length > 0 ? zip : "any Windows zip") + ") -> " + e.Dir);
+            EmuCard card2 = MakeCard(e);
+            cards.Add(card2);
             SortCards();
             ApplyStyle(); DoLayout();
-            cardsHost.ScrollControlIntoView(card.Box);
-            CheckOne(card, delegate { if (card.Rel != null) StartUpdate(card, null); });   // the user pressed Install (queued if busy)
+            cardsHost.ScrollControlIntoView(card2.Box);
+            CheckOne(card2, delegate { if (card2.Rel != null) StartUpdate(card2, null); });   // the user pressed Install (queued if busy)
         }
     }
 
@@ -3252,11 +3329,7 @@ class EmuForm : Form
     {
         if (IsBusy) { PleaseWait(); return; }
         List<EmuDef> recs = Core.RecommendedNotAdded();
-        if (recs.Count == 0 && !first)
-        {
-            if (Ask("Add emulator", "You already have all the recommended emulators.", "Add from link...", "Close") == 0) AddFork();
-            return;
-        }
+        if (recs.Count == 0 && !first) { AddFork(); return; }   // all the recommended ones are on the list: straight to a link
         bool fromLink = false;
         using (Form f = new Form())
         {
@@ -3391,7 +3464,7 @@ class EmuForm : Form
         }
         if (IsBusy) { BeginInvoke((MethodInvoker)delegate { WhenIdle(() => AddFound(list, i, then)); }); return; }
         EmuDef d = list[i];
-        if (Core.Cfg.Emulators.Any(x => string.Equals(x.Repo, d.Repo, StringComparison.OrdinalIgnoreCase) && x.Host == d.Host)) { AddFound(list, i + 1, then); return; }
+        if (Core.Cfg.Emulators.Any(x => Core.SameRepo(x.Host, x.Repo, d.Host, d.Repo))) { AddFound(list, i + 1, then); return; }
         // its card shows right away, with the version check on it; taken off again if the user says no
         EmuCard card = AddDef(d, null);
         if (card == null) { AddFound(list, i + 1, then); return; }
@@ -3746,6 +3819,23 @@ class EmuForm : Form
             }
             Marshal.StructureToPtr(after, m.LParam, false);
             m.Result = IntPtr.Zero;
+            return;
+        }
+        if (m.Msg == 0x214 && contentHeight > 0)   // WM_SIZING: an edge dragged no further down than the tiles need
+        {
+            int side = m.WParam.ToInt32();   // WMSZ_TOP 3, TOPLEFT 4, TOPRIGHT 5, BOTTOM 6, BOTTOMLEFT 7, BOTTOMRIGHT 8
+            if (side >= 3 && side <= 8)
+            {
+                NcRect r = (NcRect)Marshal.PtrToStructure(m.LParam, typeof(NcRect));
+                int most = Math.Max(MinimumSize.Height, cardsHost.Top + contentHeight + D(32) + D(34) + (Height - ClientSize.Height));   // as FitHeight
+                // (a corner drag that changes the width uses the tiles' height at the last layout: it catches up as the drag goes on)
+                if (r.B - r.T > most)
+                {
+                    if (side >= 6) r.B = r.T + most; else r.T = r.B - most;
+                    Marshal.StructureToPtr(r, m.LParam, false);
+                }
+            }
+            base.WndProc(ref m);
             return;
         }
         if (m.Msg == 0x84)   // WM_NCHITTEST

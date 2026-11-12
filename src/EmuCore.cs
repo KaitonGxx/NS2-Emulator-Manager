@@ -75,7 +75,17 @@ public static class Core
     public static string ConfigPath;
     public static Config Cfg;
     public static bool FirstRun;
-    public const string MAIN_REPO = "Djihads80/Eglantine";   // Eglantine main: always listed first
+    public const string MAIN_REPO = "Eglantine-Community/Eglantine";   // Eglantine main: always listed first
+    // Names a repository had before it moved (GitHub forwards them): lists, install records and build folders saved
+    // by older versions still carry them, so they count as the same repository everywhere.
+    static readonly string[][] MOVED = { new[] { "Djihads80/Eglantine", MAIN_REPO } };
+    public static string CanonRepo(string repo)
+    {
+        foreach (string[] m in MOVED) if (string.Equals(repo, m[0], StringComparison.OrdinalIgnoreCase)) return m[1];
+        return repo;
+    }
+    public static bool SameRepo(string a, string b) { return string.Equals(CanonRepo(a), CanonRepo(b), StringComparison.OrdinalIgnoreCase); }
+    public static bool SameRepo(string hostA, string a, string hostB, string b) { return hostA == hostB && SameRepo(a, b); }
     public const string MANAGER_REPO = "KaitonGxx/NS2-Emulator-Manager";   // where the manager itself is released
     public const string MANAGER_ZIP = "NS2EmulatorManager.zip";
 
@@ -126,18 +136,17 @@ public static class Core
         log("Manager " + r.Tag + " is ready: " + setup);
         return setup;
     }
-    // Naming rule: the upstream repo is "Eglantine Main"; every other build is just its name. A "(... fork)" ending
-    // (older versions added "(fork)") is dropped, so "PokeDinner (fork)" and "PokeDinner (Eglantine fork)" -> "PokeDinner".
-    // Only the name: the folders keep the names they were made with.
+    // Naming rule: an emulator keeps the name it was given (the recommended ones come named, "Eglantine Main" and so on;
+    // one added by link has the name the user typed). Only a "(... fork)" ending is dropped (older versions added
+    // "(fork)"), so "PokeDinner (fork)" and "PokeDinner (Eglantine fork)" -> "PokeDinner". The folders keep their names.
     public static string DisplayName(EmuDef e)
     {
-        if (IsMainRepo(e)) return "Eglantine Main";
         string n = Regex.Replace((e.Name ?? "").Trim(), @"\s*\([^()]*\bfork\)\s*$", "", RegexOptions.IgnoreCase).Trim();
         if (n.Length == 0) n = (e.Repo ?? "Build").Split('/').Last();
         return n;
     }
 
-    public static bool IsMainRepo(EmuDef e) { return e.Host == "github" && string.Equals(e.Repo, MAIN_REPO, StringComparison.OrdinalIgnoreCase); }                // no config existed: show the welcome list
+    public static bool IsMainRepo(EmuDef e) { return e.Host == "github" && SameRepo(e.Repo, MAIN_REPO); }                // no config existed: show the welcome list
     static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = 64 * 1024 * 1024 };
 
     public static bool IsProtected(string name)
@@ -173,11 +182,13 @@ public static class Core
             bool used = !string.IsNullOrEmpty(e.Dir) && (File.Exists(Path.Combine(e.Dir, e.Exe ?? "")) || LoadManifest(e.Dir) != null);
             bool backups = false;
             try { backups = Backups(e).Count > 0; } catch { }
-            if (rec.Contains(e.Repo ?? "") && !used && !backups) Cfg.Emulators.Remove(e);
+            if (rec.Contains(CanonRepo(e.Repo ?? "")) && !used && !backups) Cfg.Emulators.Remove(e);
             else e.Added = true;
             renamed = true;
         }
         foreach (EmuDef e in Cfg.Emulators) { string n = DisplayName(e); if (n != e.Name) { e.Name = n; renamed = true; } }
+        foreach (EmuDef e in Cfg.Emulators)   // a repository that moved: its new name (GitHub forwards the old one)
+            if (e.Host == "github" && !string.IsNullOrEmpty(e.Repo) && CanonRepo(e.Repo) != e.Repo) { e.Repo = CanonRepo(e.Repo); renamed = true; }
         foreach (EmuDef e in Cfg.Emulators)   // 1.1.x wording of the recommended note
             if (e.Note == "Newest upstream nx2 build: try new games here first") { e.Note = "Newest version: try new games here first"; renamed = true; }
         if (renamed) try { SaveConfig(); } catch { }
@@ -204,7 +215,7 @@ public static class Core
         return new List<EmuDef>
         {
             new EmuDef { Id = "eglantine", Name = "Eglantine Main", Note = "Newest version: try new games here first", Host = "github",
-                         Repo = "Djihads80/Eglantine", TagPrefix = "daily-",
+                         Repo = MAIN_REPO, TagPrefix = "daily-",
                          Assets = new List<string> { "^eglantine-windows-x86_64-pgo\\.zip$", "^eglantine-windows-x86_64\\.zip$" },
                          Dir = Path.Combine(b, "Eglantine Main"), Exe = "eglantine.exe" },
             new EmuDef { Id = "pokedinner", Name = "PokeDinner", Note = "Pokopia", Host = "gitea", ApiBase = "https://git.eden-emu.dev/api/v1",
@@ -219,7 +230,7 @@ public static class Core
     // Recommended builds not on the list yet (matched by fork repo).
     public static List<EmuDef> RecommendedNotAdded()
     {
-        return Recommended(Home).Where(r => !Cfg.Emulators.Any(x => string.Equals(x.Repo, r.Repo, StringComparison.OrdinalIgnoreCase) && x.Host == r.Host)).ToList();
+        return Recommended(Home).Where(r => !Cfg.Emulators.Any(x => SameRepo(x.Host, x.Repo, r.Host, r.Repo))).ToList();
     }
 
     public static void SaveConfig()
@@ -505,7 +516,7 @@ public static class Core
     public static bool BelongsTo(Manifest m, EmuDef e)
     {
         if (m == null || string.IsNullOrEmpty(m.Asset)) return false;
-        if (!string.IsNullOrEmpty(m.Repo)) return string.Equals(m.Repo, e.Repo, StringComparison.OrdinalIgnoreCase);
+        if (!string.IsNullOrEmpty(m.Repo)) return SameRepo(m.Repo, e.Repo);
         // older manifests: the generic "*win*.zip" patterns would accept any fork's zip, so also require the zip's
         // name to carry the exe's name (lichii-windows-...zip for lichii.exe); otherwise the exe check decides
         string stem = Path.GetFileNameWithoutExtension(e.Exe ?? "");
@@ -719,6 +730,29 @@ public static class Core
         return p;
     }
 
+    // The pattern for one Windows zip the user picked by name, so later releases find the same kind of file: the parts
+    // that change from release to release (version numbers, dates, build numbers, commit ids) match anything, the rest
+    // must stay ("eglantine-windows-x86_64-pgo.zip", "Lichii-1.2.3-win64.zip" -> also "Lichii-1.3-win64.zip"). A zip
+    // without "pgo" in its name never matches a PGO one.
+    public static string AssetPattern(string zip)
+    {
+        string ext = Path.GetExtension(zip ?? ""), stem = (zip ?? "").Substring(0, (zip ?? "").Length - ext.Length);
+        string[] parts = Regex.Split(stem, @"([-_. +]+)");   // words and the separators between them
+        Func<string, bool> changes = t => Regex.IsMatch(t, @"^[vV]?\d[0-9A-Za-z]*$") || (t.Length >= 7 && Regex.IsMatch(t, @"^[0-9a-fA-F]+$") && Regex.IsMatch(t, @"\d"));
+        StringBuilder sb = new StringBuilder("(?i)^");
+        if (stem.IndexOf("pgo", StringComparison.OrdinalIgnoreCase) < 0) sb.Append("(?!.*pgo)");
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (i % 2 == 0 && parts[i].Length > 0 && changes(parts[i]))
+            {   // this word and any changing words right after it (with their separators): one wildcard
+                while (i + 2 < parts.Length && changes(parts[i + 2])) i += 2;
+                sb.Append(@"v?[0-9a-z]*\d[0-9a-z]*(?:[-_. +]v?[0-9a-z]*\d[0-9a-z]*)*");   // words with a digit in them (not "debug")
+            }
+            else sb.Append(Regex.Escape(parts[i]));
+        }
+        return sb.Append(Regex.Escape(ext)).Append("$").ToString();
+    }
+
     public class Channel { public string Prefix, Newest, NewestDate; public int Count; }
     public class RepoInfo
     {
@@ -763,6 +797,7 @@ public static class Core
         if (name.EndsWith(".git", StringComparison.OrdinalIgnoreCase)) name = name.Substring(0, name.Length - 4);
         RepoInfo ri = new RepoInfo();
         ri.Repo = owner + "/" + name; ri.Name = name;
+        if (host == "github.com" || host == "www.github.com") { ri.Repo = CanonRepo(ri.Repo); ri.Name = ri.Repo.Split('/')[1]; }
         if (host == "github.com" || host == "www.github.com") { ri.Host = "github"; ri.WebUrl = "https://github.com/" + ri.Repo; }
         else { ri.Host = "gitea"; ri.ApiBase = scheme + "://" + host + port + "/api/v1"; ri.WebUrl = scheme + "://" + host + port + "/" + ri.Repo; }
         object[] list;
@@ -1073,7 +1108,7 @@ public static class Core
                     Manifest m = LoadManifest(d);
                     if (m == null) continue;
                     bool mine = !string.IsNullOrEmpty(m.Id) ? m.Id == e.Id
-                              : !string.IsNullOrEmpty(m.Repo) ? string.Equals(m.Repo, e.Repo, StringComparison.OrdinalIgnoreCase)
+                              : !string.IsNullOrEmpty(m.Repo) ? SameRepo(m.Repo, e.Repo)
                               : Path.GetFileName(d).StartsWith(Stem(e) + " ", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(e.Exe) && File.Exists(Path.Combine(d, e.Exe));
                     if (mine) all.Add(d);
                 }
@@ -1232,7 +1267,7 @@ public static class Core
         Manifest old = LoadManifest(dir);
         string oldLabel = old != null && !string.IsNullOrEmpty(old.Tag) ? old.Tag : (Describe(e) ?? "none");
         if (old == null) oldLabel = Regex.Replace(oldLabel, @"\s*\(from VERSION\.txt\)$", "");
-        bool sameVersion = old != null && old.Tag == m.Tag && (string.IsNullOrEmpty(old.Repo) || string.Equals(old.Repo, m.Repo, StringComparison.OrdinalIgnoreCase));
+        bool sameVersion = old != null && old.Tag == m.Tag && (string.IsNullOrEmpty(old.Repo) || SameRepo(old.Repo, m.Repo));
         List<string> incoming = Directory.GetFileSystemEntries(src).Select(Path.GetFileName)
             .Where(n => !IsProtected(n) && !string.Equals(n, MANIFEST, StringComparison.OrdinalIgnoreCase) && !IsVersionFile(n)).ToList();
         HashSet<string> outgoing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1376,13 +1411,13 @@ public static class Core
         Func<string, bool> seen = d => string.Equals(d, mine, StringComparison.OrdinalIgnoreCase) || o.Any(p => string.Equals(p.Key, d, StringComparison.OrdinalIgnoreCase));
         foreach (EmuDef x in Cfg.Emulators)
         {
-            if (x == e || x.Host != e.Host || !string.Equals(x.Repo, e.Repo, StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(x.Dir)) continue;
+            if (x == e || !SameRepo(x.Host, x.Repo, e.Host, e.Repo) || string.IsNullOrEmpty(x.Dir)) continue;
             string d = FullDir(x.Dir);
             if (!seen(d) && !string.IsNullOrEmpty(x.Exe) && File.Exists(Path.Combine(d, x.Exe))) o.Add(new KeyValuePair<string, string>(d, Describe(x) ?? "?"));
         }
         foreach (KnownInstall k in LoadKnown())
         {
-            if (k.Host != e.Host || !string.Equals(k.Repo, e.Repo, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!SameRepo(k.Host, k.Repo, e.Host, e.Repo)) continue;
             string d = FullDir(k.Dir);
             if (seen(d) || string.IsNullOrEmpty(e.Exe) || !File.Exists(Path.Combine(d, e.Exe))) continue;
             Manifest m = LoadManifest(d);

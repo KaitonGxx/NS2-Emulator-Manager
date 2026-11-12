@@ -70,7 +70,7 @@ The icon is drawn from `src\icon.html`. To redraw it, run `python src\make_icon.
 ## Credits
 
 - The emulators are made and hosted by their own projects:
-  [Eglantine](https://github.com/Djihads80/Eglantine),
+  [Eglantine](https://github.com/Eglantine-Community/Eglantine),
   [PokeDinner](https://git.eden-emu.dev/Franseven/PokeDinner-a-Eglantine-Fork),
   [Lichii](https://github.com/zortos293/Lichii).
   This tool only downloads their official releases.
