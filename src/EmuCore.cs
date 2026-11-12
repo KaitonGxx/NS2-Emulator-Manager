@@ -43,6 +43,8 @@ public class Config
     public List<string> NoSetupReminder { get; set; }   // emulator ids whose card doesn't say "Next: add your keys / firmware"
     public string Window { get; set; }          // main window as the user left it: "x,y,width,height,maximized" (screen pixels)
     public string Colors { get; set; }          // colour scheme picked in Colors... (an id from Theme.Schemes: purple, ocean, sakura...)
+    public bool Portable { get; set; }          // the portable edition (also a portable.txt next to the exe); kept here in case that file is deleted
+    public string LastHome { get; set; }        // the folder this list was saved in: when it changes (a USB stick on another drive letter, a copied folder), paths are moved along
 }
 
 public class Release
@@ -72,6 +74,12 @@ public static class Core
     public const string MANIFEST = "emu-manager.json";
     public static readonly string[] PROTECTED = { "user", "metadata" };
     public static string Home;                  // folder of the exe (or of --config)
+    // The portable edition: a portable.txt next to EmuManager.exe (the portable zip has one). Everything stays in its folder:
+    // the manager's data, emulators, their saves; no registry, no shortcuts, removals go to its "Removed items" folder.
+    public const string PORTABLE_MARK = "portable.txt";
+    public static bool Portable;
+    public static bool PortableAllowed = true;   // false for --sandbox / --config and for a folder Setup installed into
+    public const string REMOVED = "Removed items";
     public static string ConfigPath;
     public static Config Cfg;
     public static bool FirstRun;
@@ -161,14 +169,35 @@ public static class Core
         ConfigPath = Path.GetFullPath(path);
         Home = Path.GetDirectoryName(ConfigPath);
         if (!File.Exists(ConfigPath))
-        {   // first start (new user, or a fresh test environment): the known builds, nothing installed
-            Cfg = DefaultConfig(Home);
-            SaveConfig();
-            FirstRun = true;
-            return;
+        {
+            // a save that stopped halfway (the file renamed to .bak, the new one still .tmp), or the file deleted: the
+            // newest copy next to it, never a fresh start that would forget every emulator
+            foreach (string b in new[] { ConfigPath + ".tmp", ConfigPath + ".bak" })
+                if ((Cfg = ReadConfig(b)) != null) { RestoredFromBackup = true; break; }
+            if (Cfg == null)
+            {   // first start (new user, or a fresh test environment): the known builds, nothing installed
+                Cfg = DefaultConfig(Home);
+                Cfg.Portable = Portable; Cfg.LastHome = FullDir(Home);
+                SaveConfig();
+                FirstRun = true;
+                return;
+            }
+            SaveConfig();   // back in place
         }
-        Cfg = Json.Deserialize<Config>(File.ReadAllText(ConfigPath, Encoding.UTF8));
+        else Cfg = ReadConfig(ConfigPath, true);
+        if (Cfg == null)
+        {   // damaged (a USB stick pulled out while saving, a power cut): the copy from the save before, never a fresh start
+            foreach (string b in new[] { ConfigPath + ".bak", ConfigPath + ".tmp" })
+                if ((Cfg = ReadConfig(b)) != null) { RestoredFromBackup = true; keepBak = true; break; }
+            if (Cfg == null) Cfg = Json.Deserialize<Config>(File.ReadAllText(ConfigPath, Encoding.UTF8));   // shows why
+        }
         if (Cfg.Emulators == null) Cfg.Emulators = new List<EmuDef>();
+        // portable: the marker file was deleted but the list says portable: still portable (and the marker comes back)
+        if (Cfg.Portable && !Portable && PortableAllowed)
+        {
+            Portable = true;
+            try { File.WriteAllText(Path.Combine(Home, PORTABLE_MARK), PortableNote); } catch { }
+        }
         if (Cfg.KeepPrevious <= 0) Cfg.KeepPrevious = 2;
         if (string.IsNullOrEmpty(Cfg.Theme)) Cfg.Theme = "system";
         if (Cfg.NoInstallPrompt == null) Cfg.NoInstallPrompt = new List<string>();
@@ -191,11 +220,104 @@ public static class Core
             if (e.Host == "github" && !string.IsNullOrEmpty(e.Repo) && CanonRepo(e.Repo) != e.Repo) { e.Repo = CanonRepo(e.Repo); renamed = true; }
         foreach (EmuDef e in Cfg.Emulators)   // 1.1.x wording of the recommended note
             if (e.Note == "Newest upstream nx2 build: try new games here first") { e.Note = "Newest version: try new games here first"; renamed = true; }
+        if (Portable && !Cfg.Portable) { Cfg.Portable = true; renamed = true; }
+        string oldHome = Cfg.LastHome;
+        if (string.IsNullOrEmpty(oldHome) || !string.Equals(FullDir(oldHome), FullDir(Home), StringComparison.OrdinalIgnoreCase))
+        {
+            Reroot(oldHome);
+            // shared-data links that still lead into the folder's old place (moved / copied): this folder's Shared data
+            if (!string.IsNullOrEmpty(oldHome))
+                try { UserData.RepairLinks(oldHome, EmuForm.FileLog); } catch (Exception ex) { EmuForm.FileLog("Checking shared-data links: " + ex.Message); }
+            Cfg.LastHome = FullDir(Home); renamed = true;
+        }
         if (renamed) try { SaveConfig(); } catch { }
         // remember every installed build, so a later reinstall of the manager can spot a second copy
         foreach (EmuDef e in Cfg.Emulators)
             if (!string.IsNullOrEmpty(e.Exe) && !string.IsNullOrEmpty(e.Dir) && File.Exists(Path.Combine(e.Dir, e.Exe)))
             { Manifest m = LoadManifest(e.Dir); RememberInstall(e, m != null ? m.Tag : null); }
+    }
+
+    public static bool RestoredFromBackup;   // emulators.json was damaged: the backup copy was used
+    // null: missing, empty or not a settings file (damaged). ioThrows: a file that stays locked or unreadable is an
+    // error shown to the user, not a reason to fall back to an older copy.
+    static Config ReadConfig(string f, bool ioThrows = false)
+    {
+        if (!File.Exists(f)) return null;
+        string t = null;
+        for (int i = 0; ; i++)
+            try { t = File.ReadAllText(f, Encoding.UTF8); break; }
+            catch (FileNotFoundException) { return null; }
+            catch (Exception ex)
+            {
+                if (!(ex is IOException) && !(ex is UnauthorizedAccessException)) throw;
+                if (i < 10) { Thread.Sleep(200); continue; }   // a virus scanner, indexer or OneDrive has it open
+                if (ioThrows) throw;
+                return null;
+            }
+        if (t.Trim().Length == 0) return null;
+        try { Config c = Json.Deserialize<Config>(t); return c != null && c.Emulators != null ? c : null; }
+        catch { return null; }
+    }
+
+    public const string PortableNote = "This folder is the portable NS2 Emulator Manager.\r\nEverything it uses stays in this folder: your emulators, their saves, and the manager's settings.\r\nKeep this file next to EmuManager.exe. To move or back up everything, copy the whole folder.\r\n";
+
+    // The folder moved (another drive letter, another PC, a copy): paths saved under the old place now point inside this
+    // one. Only paths that were inside the old folder change; a build or games folder elsewhere is left as it was.
+    // oldHome null (a list saved before this was kept): a build whose folder is gone but sits here by name is found.
+    static bool Reroot(string oldHome)
+    {
+        string home = FullDir(Home);
+        string old = string.IsNullOrEmpty(oldHome) ? null : FullDir(oldHome);
+        Func<string, string> move = p =>
+        {
+            if (string.IsNullOrEmpty(p) || old == null) return p;
+            string f = FullDir(p);
+            if (string.Equals(f, old, StringComparison.OrdinalIgnoreCase)) return home;
+            if (f.StartsWith(old + "\\", StringComparison.OrdinalIgnoreCase)) return home + f.Substring(old.Length);
+            return p;
+        };
+        bool changed = false;
+        foreach (EmuDef e in Cfg.Emulators)
+        {
+            if (string.IsNullOrEmpty(e.Dir)) continue;
+            string d = move(e.Dir);
+            string parent = Path.GetDirectoryName(FullDir(e.Dir));
+            bool looksMoved = parent != null && string.Equals(Path.GetFileName(parent), Path.GetFileName(home), StringComparison.OrdinalIgnoreCase);
+            if (d == e.Dir && !Directory.Exists(e.Dir) && looksMoved)
+            {   // the old folder's place isn't known, but this build sat in a folder named like this one: the same name here,
+                // if it holds this build (a build on a drive that's just unplugged is left alone)
+                string here = Path.Combine(home, Path.GetFileName(FullDir(e.Dir)));
+                Manifest m = Directory.Exists(here) ? LoadManifest(here) : null;
+                if (m != null && (m.Id == e.Id || (string.IsNullOrEmpty(m.Id) && BelongsTo(m, e)))) d = here;
+            }
+            if (d != e.Dir) { EmuForm.FileLog(e.Name + ": the folder moved: " + e.Dir + " -> " + d); e.Dir = d; changed = true; }
+        }
+        string g = move(Cfg.GamesFolder);
+        if (g != Cfg.GamesFolder) { Cfg.GamesFolder = g; changed = true; }
+        if (Cfg.ShareBackups != null)
+            foreach (string id in Cfg.ShareBackups.Keys.ToList())
+            {
+                List<string> l = Cfg.ShareBackups[id];
+                if (l == null) continue;
+                for (int i = 0; i < l.Count; i++)
+                {
+                    string n = move(l[i]);
+                    if (n == l[i] && !string.IsNullOrEmpty(l[i]) && !Directory.Exists(l[i]))
+                    {   // Set aside folders always live in <folder>\Shared data\Set aside
+                        int k = l[i].IndexOf("\\" + UserData.SHARED + "\\", StringComparison.OrdinalIgnoreCase);
+                        if (k >= 0) { string t = home + l[i].Substring(k); if (Directory.Exists(t)) n = t; }
+                    }
+                    if (n != l[i]) { l[i] = n; changed = true; }
+                }
+            }
+        if (old != null)
+        {   // the list of known installs: the ones that were in the old folder
+            List<KnownInstall> k = LoadKnown(); bool kc = false;
+            foreach (KnownInstall x in k) { string n = move(x.Dir); if (n != x.Dir) { x.Dir = n; kc = true; } }
+            if (kc) SaveKnown(k);
+        }
+        if (changed) EmuForm.FileLog("The manager's folder moved (" + (old ?? "an older place") + " -> " + home + "): paths updated.");
+        return changed;
     }
 
     // What a new user starts with: no builds (the window lists only what they add) and no games folder yet.
@@ -233,11 +355,23 @@ public static class Core
         return Recommended(Home).Where(r => !Cfg.Emulators.Any(x => SameRepo(x.Host, x.Repo, r.Host, r.Repo))).ToList();
     }
 
+    // Written to a .tmp first and flushed to the disk (a USB stick pulled out right after still has a whole file), then
+    // swapped in; the copy before stays as emulators.json.bak, which LoadConfig uses if the file is ever damaged.
+    static readonly object saveLock = new object();
+    static bool keepBak;   // emulators.json was damaged: the next save replaces it without making the damaged copy the backup
     public static void SaveConfig()
     {
-        string tmp = ConfigPath + ".tmp";
-        File.WriteAllText(tmp, Pretty(Json.Serialize(Cfg)), new UTF8Encoding(false));
-        if (File.Exists(ConfigPath)) File.Replace(tmp, ConfigPath, null); else File.Move(tmp, ConfigPath);
+        lock (saveLock)
+        {
+            string tmp = ConfigPath + ".tmp";
+            byte[] data = new UTF8Encoding(false).GetBytes(Pretty(Json.Serialize(Cfg)));
+            using (FileStream f = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+            { f.Write(data, 0, data.Length); f.Flush(true); }
+            if (!File.Exists(ConfigPath)) { File.Move(tmp, ConfigPath); return; }
+            for (int i = 0; ; i++)
+                try { File.Replace(tmp, ConfigPath, keepBak ? null : ConfigPath + ".bak"); keepBak = false; break; }
+                catch (IOException) { if (i >= 4) throw; Thread.Sleep(150); }   // a virus scanner or indexer reading it
+        }
     }
 
     // Indents JavaScriptSerializer's one-line output so the file stays hand-editable.
@@ -536,6 +670,8 @@ public static class Core
         if (Path.GetPathRoot(d).TrimEnd('\\') == d) return "Pick a folder of its own, not the top of a drive.";
         if (Cfg.Sandbox && !d.StartsWith(home + "\\", StringComparison.OrdinalIgnoreCase))
             return "This is the test environment: builds must stay inside " + home + ".";
+        if (Portable && !d.StartsWith(home + "\\", StringComparison.OrdinalIgnoreCase))
+            return "The portable manager keeps everything in its own folder: pick a folder inside " + home + ".";
         if (string.Equals(d, home, StringComparison.OrdinalIgnoreCase) || inside(home, d)) return "Pick a folder of its own for this build (not the manager's folder or one around it).";
         foreach (string own in new[] { "downloads", "previous" })
             if (inside(d, Path.Combine(home, own))) return "That's one of the manager's own folders (" + own + ").";
@@ -916,7 +1052,7 @@ public static class Core
     {
         get
         {
-            return Cfg != null && Cfg.Sandbox ? Path.Combine(Home, ".manager-data")
+            return Cfg != null && Cfg.Sandbox || Portable ? Path.Combine(Home, ".manager-data")
                  : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Switch2EmulatorManager");
         }
     }
@@ -1383,7 +1519,7 @@ public static class Core
     {
         try { Directory.CreateDirectory(DataDir); File.WriteAllText(KnownFile, Pretty(Json.Serialize(k)), new UTF8Encoding(false)); } catch { }
     }
-    static string FullDir(string d) { try { return Path.GetFullPath(d).TrimEnd('\\'); } catch { return d ?? ""; } }
+    static string FullDir(string d) { try { string f = Path.GetFullPath(d); return Path.GetPathRoot(f) == f ? f : f.TrimEnd('\\'); } catch { return d ?? ""; } }
 
     public static void RememberInstall(EmuDef e, string tag)
     {
@@ -1415,10 +1551,12 @@ public static class Core
             string d = FullDir(x.Dir);
             if (!seen(d) && !string.IsNullOrEmpty(x.Exe) && File.Exists(Path.Combine(d, x.Exe))) o.Add(new KeyValuePair<string, string>(d, Describe(x) ?? "?"));
         }
+        string inHome = FullDir(Home) + "\\";
         foreach (KnownInstall k in LoadKnown())
         {
             if (!SameRepo(k.Host, k.Repo, e.Host, e.Repo)) continue;
             string d = FullDir(k.Dir);
+            if (Portable && !d.StartsWith(inHome, StringComparison.OrdinalIgnoreCase)) continue;   // on this PC, outside the portable folder: can't be used
             if (seen(d) || string.IsNullOrEmpty(e.Exe) || !File.Exists(Path.Combine(d, e.Exe))) continue;
             Manifest m = LoadManifest(d);
             if (m != null && !BelongsTo(m, e)) continue;

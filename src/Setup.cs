@@ -21,13 +21,29 @@ using Microsoft.Win32;
 
 static class SetupApp
 {
-    public const string APP = "NS2 Emulator Manager", VERSION = "1.3.7", PUBLISHER = "NS2 Emulator Manager";
+    public const string APP = "NS2 Emulator Manager", VERSION = "1.3.8", PUBLISHER = "NS2 Emulator Manager";
     public const string KEY = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Switch2EmulatorManager";
     public static string DesktopLnk { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "NS2 Emulator Manager.lnk"); } }
     public static string StartLnk { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "NS2 Emulator Manager.lnk"); } }
     // shortcut names before 1.2.5 (the program was called "Switch 2 Emulator Manager"): replaced on install, removed on uninstall
     public static string[] OldLnks { get { return new[] { Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Switch 2 Emulators.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Switch 2 Emulator Manager.lnk") }; } }
     public static string DefaultDir { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Switch 2 Emulators"); } }
+
+    // A folder with the portable manager in it (portable.txt next to EmuManager.exe).
+    public static bool IsPortableDir(string dir)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(dir) || !File.Exists(Path.Combine(dir, Core.PORTABLE_MARK))) return false;
+            using (RegistryKey k = Registry.CurrentUser.OpenSubKey(KEY))
+            {   // the folder Apps & features points at stays the installed manager (as the manager itself decides)
+                string at = k == null ? null : k.GetValue("InstallLocation") as string;
+                if (!string.IsNullOrEmpty(at) && string.Equals(Path.GetFullPath(at).TrimEnd('\\'), Path.GetFullPath(dir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) return false;
+            }
+            return true;
+        }
+        catch { return false; }
+    }
 
     public static string InstalledDir()
     {
@@ -67,7 +83,9 @@ static class SetupApp
             // silent install, like pressing Install with the default ticks (shortcuts + Apps & features); DIR optional
             if (args.Length >= 1 && args[0] == "--silent-install")
             {
-                string w = Install(args.Length >= 2 ? Path.GetFullPath(args[1]) : (InstalledDir() ?? DefaultDir), true, true, true, s => Console.WriteLine(s));
+                string sd = args.Length >= 2 ? Path.GetFullPath(args[1]) : (InstalledDir() ?? DefaultDir);
+                if (IsPortableDir(sd)) { FileLog("--silent-install: " + sd + " is a portable folder; not installing there."); return 1; }
+                string w = Install(sd, true, true, true, s => Console.WriteLine(s));
                 return w.Length == 0 ? 0 : 2;
             }
             if (args.Length >= 2 && args[0] == "--test-install") { Install(Path.GetFullPath(args[1]), false, false, false, s => Console.WriteLine(s)); return 0; }
@@ -78,14 +96,28 @@ static class SetupApp
         Application.SetCompatibleTextRenderingDefault(false);
         if (args.Contains("--uninstall"))
         {
-            string dir = InstalledDir() ?? Path.GetDirectoryName(Application.ExecutablePath);
+            string own = Path.GetDirectoryName(Application.ExecutablePath);
+            if (IsPortableDir(own))
+            {
+                MessageBox.Show("This is the portable manager: there's nothing to uninstall.\r\n\r\nTo remove it, close it and delete its folder. That deletes its emulators and saves too, so copy your saves first.", APP, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return 0;
+            }
+            string dir = InstalledDir() ?? own;
             Theme.Set(ColorsOf(dir));
             Application.Run(new SetupForm(true, dir));
         }
         else
         {   // --update DIR: started by the manager in DIR to update itself (its folder, even without an Apps entry)
             int ui = Array.IndexOf(args, "--update");
-            string pre = ui >= 0 && ui + 1 < args.Length && File.Exists(Path.Combine(args[ui + 1], "EmuManager.exe")) ? Path.GetFullPath(args[ui + 1]).TrimEnd('\\') : null;
+            string pre = null;
+            if (ui >= 0 && ui + 1 < args.Length)
+                try
+                {
+                    string f = Path.GetFullPath(args[ui + 1]);
+                    if (Path.GetPathRoot(f) != f) f = f.TrimEnd('\\');
+                    if (File.Exists(Path.Combine(f, "EmuManager.exe"))) pre = f;
+                }
+                catch { }
             string home = pre ?? InstalledDir();
             Theme.Set(ColorsOf(home));
             Application.Run(new SetupForm(false, home));
@@ -125,13 +157,29 @@ static class SetupApp
         if (!File.Exists(appFile))
             throw new Exception("EmuManager.exe isn't next to Setup.exe. Extract the whole zip first (right-click it > Extract All), then run Setup.exe from that folder.");
         byte[] payload = File.ReadAllBytes(appFile);
+        bool portable = IsPortableDir(dir);
+        if (portable && !File.Exists(Path.Combine(dir, "EmuManager.exe"))) throw new Exception("This folder has a portable.txt but no manager. Choose another folder.");
         Directory.CreateDirectory(dir);
         if (ManagerRunning(dir)) throw new Exception("Close the NS2 Emulator Manager first, then try again.");
         string exe = Path.Combine(dir, "EmuManager.exe"), tmp = exe + ".new";
         File.WriteAllBytes(tmp, payload);
-        if (File.Exists(exe)) File.Delete(exe);
-        File.Move(tmp, exe);
+        if (File.Exists(exe))
+        {   // the old one is kept until the new one is in place: a failure halfway never leaves the folder without a manager
+            string bak = exe + ".old";
+            if (File.Exists(bak)) File.Delete(bak);
+            File.Move(exe, bak);
+            try { File.Move(tmp, exe); } catch { File.Move(bak, exe); throw; }
+            try { File.Delete(bak); } catch { }
+        }
+        else File.Move(tmp, exe);
         log("Copied EmuManager.exe");
+        if (portable)
+        {   // the portable manager: just the new exe. No Apps & features entry, no shortcuts, no icon files: it stays a folder
+            // that can be copied anywhere
+            log("Portable folder: updated EmuManager.exe only (no Apps & features entry, no shortcuts).");
+            FileLog("done (portable)");
+            return "";
+        }
         string icon = WriteIcon(dir, log) ?? exe;
         string un = Path.Combine(dir, "Uninstall.exe");
         if (!string.Equals(Path.GetFullPath(Application.ExecutablePath), Path.GetFullPath(un), StringComparison.OrdinalIgnoreCase))
@@ -197,9 +245,10 @@ static class SetupApp
     public static bool Uninstall(string dir, bool settings, bool registryAndShortcuts, Action<string> log)
     {
         if (ManagerRunning(dir)) throw new Exception("Close the NS2 Emulator Manager first.");
+        if (IsPortableDir(dir)) throw new Exception("This is the portable manager: there's nothing to uninstall. To remove it, delete its folder (that deletes its emulators and saves too, so copy your saves first).");
         string exe = Path.Combine(dir, "EmuManager.exe");
         if (File.Exists(exe)) { File.Delete(exe); log("Removed EmuManager.exe"); }
-        foreach (string f in new[] { "EmuManager.next.exe", "EmuManager.exe.new" }) try { File.Delete(Path.Combine(dir, f)); } catch { }
+        foreach (string f in new[] { "EmuManager.next.exe", "EmuManager.exe.new", "EmuManager.exe.old" }) try { File.Delete(Path.Combine(dir, f)); } catch { }
         try { foreach (string f in Directory.GetFiles(dir, "EmuManager-*.ico")) File.Delete(f); } catch { }   // the shortcuts' icon
         if (settings)
             foreach (string f in new[] { "emulators.json", "emulators.json.tmp", "manager.log" })
@@ -208,7 +257,14 @@ static class SetupApp
         {
             foreach (string l in new[] { DesktopLnk, StartLnk }.Concat(OldLnks))
                 if (File.Exists(l) && LinkTarget(l).Equals(exe, StringComparison.OrdinalIgnoreCase)) { File.Delete(l); log("Removed " + Path.GetFileName(l)); }
-            try { Registry.CurrentUser.DeleteSubKeyTree(KEY, false); log("Removed from Apps & features"); } catch { }
+            try
+            {   // only when the entry is this folder's (an Uninstall.exe copied along with a folder must not remove another install's)
+                string at = null;
+                using (RegistryKey k = Registry.CurrentUser.OpenSubKey(KEY)) at = k == null ? null : k.GetValue("InstallLocation") as string;
+                if (at == null || string.Equals(Path.GetFullPath(at).TrimEnd('\\'), Path.GetFullPath(dir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                { Registry.CurrentUser.DeleteSubKeyTree(KEY, false); log("Removed from Apps & features"); }
+            }
+            catch { }
         }
         // Uninstall.exe can't delete itself while it runs, and a hidden "cmd /c del" afterwards is what malware does
         // (antivirus scanners flag it), so when it is the one running it stays behind: the window says so.
@@ -283,6 +339,7 @@ class SetupForm : Form
     static bool Offscreen { get { return Environment.GetEnvironmentVariable("NS2_DEMO_OFFSCREEN") == "1"; } }
     protected override bool ShowWithoutActivation { get { return Offscreen; } }
     readonly bool uninstall;
+    readonly bool portable;   // updating the portable manager: only its exe changes
     readonly string existing;
     readonly TextBox dir = new TextBox();
     readonly CheckBox desk = new CheckBox(), start = new CheckBox(), run = new CheckBox(), settings = new CheckBox();
@@ -310,11 +367,13 @@ class SetupForm : Form
         Controls.Add(go); Controls.Add(cancel);
         cancel.Click += delegate { Close(); };
 
+        portable = !uninstall && SetupApp.IsPortableDir(existing);
         if (!uninstall)
         {
             title.Text = existing != null ? "Update " + SetupApp.APP : SetupApp.APP;
-            sub.Text = "Version " + SetupApp.VERSION;
-            info.Text = existing != null
+            sub.Text = "Version " + SetupApp.VERSION + (portable ? " (portable)" : "");
+            info.Text = portable ? "Updates the portable manager in this folder. Your emulators and saves are kept, and nothing is added to Windows."
+                : existing != null
                 ? "Updates the manager. Your emulators and saves are kept."
                 : "Installs the manager. You pick your emulators when it opens.";
             Label dl = new Label(); dl.Text = "Install folder (your emulators go here too)"; dl.SetBounds(18, 82, 516, 20); dl.BackColor = Theme.Card; box.Controls.Add(dl);
@@ -330,6 +389,7 @@ class SetupForm : Form
             start.Text = "Start menu shortcut"; start.Checked = true; start.SetBounds(18, 176, 240, 26);
             run.Text = "Open the manager when setup finishes"; run.Checked = true; run.SetBounds(270, 146, 270, 26);
             foreach (CheckBox c in new[] { desk, start, run }) { c.BackColor = Theme.Card; c.ForeColor = Theme.Text; box.Controls.Add(c); EmuForm.StyleCheck(c); }
+            if (portable) { desk.Visible = start.Visible = false; desk.Checked = start.Checked = false; run.Left = desk.Left; }
             go.Text = existing != null ? "Update" : "Install";
             go.Click += delegate { DoInstall(); };
         }
@@ -361,6 +421,7 @@ class SetupForm : Form
         if (Path.GetPathRoot(d).TrimEnd('\\') == d) { Status("Choose a folder, not a whole drive.", true); return; }
         string win = Environment.GetFolderPath(Environment.SpecialFolder.Windows), pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
         if (d.StartsWith(win, StringComparison.OrdinalIgnoreCase) || d.StartsWith(pf, StringComparison.OrdinalIgnoreCase)) { Status("This folder can't be used. Choose another one.", true); return; }
+        if (!portable && SetupApp.IsPortableDir(d)) { Status("This folder has the portable manager. Choose another folder.", true); return; }
         go.Enabled = cancel.Enabled = false;
         try
         {

@@ -1135,6 +1135,7 @@ class EmuForm : Form
     void LaunchNow(EmuCard c)
     {
         if (IsBusy) { PleaseWait(); return; }
+        if (Core.Portable && Installed(c.Def) && !UserData.IsPortable(c.Def)) { MakePortable(c, true); return; }
         c.Err = null;
         string block = UserData.LaunchProblem(c.Def);
         if (block != null) { Tell("Can't launch yet", block); return; }
@@ -1199,7 +1200,7 @@ class EmuForm : Form
 
     public EmuForm()
     {
-        Text = APP + (Core.Cfg.Sandbox && Demo == null ? "  -  TEST" : "");   // --demo: screenshots, without the test label
+        Text = APP + (Core.Portable ? " (portable)" : "") + (Core.Cfg.Sandbox && Demo == null ? "  -  TEST" : "");   // --demo: screenshots, without the test label
         Icon = AppIcon();
         Font = new Font("Segoe UI", 9.5f);
         AutoScaleMode = AutoScaleMode.None;   // DoLayout scales by the screen DPI itself
@@ -1328,6 +1329,7 @@ class EmuForm : Form
             if (Demo == null) OnScreen();
             FitHeight();
             ScanInfo();   // Activated usually started it already
+            if (Core.RestoredFromBackup) { Log("emulators.json was damaged: the backup copy (emulators.json.bak) was used."); SetFooter("Your settings were restored from a backup. Your emulators and saves are untouched.", Theme.Warn); }
             if (Core.Cfg.Sandbox && Demo != null) { BeginInvoke((MethodInvoker)RunDemo); CheckAll(); return; }
             if (Core.FirstRun) { Core.FirstRun = false; ShowRecommended(true); }
             CheckAll();
@@ -1428,6 +1430,9 @@ class EmuForm : Form
         f.Show(this);
     }
 
+    // Where removed things go, in plain words: the Recycle Bin, or the portable folder's own "Removed items" (USB sticks have no bin).
+    static string Bin { get { return Core.Portable ? "the " + Core.REMOVED + " folder" : "the Recycle Bin"; } }
+
     // Save Helper's "Remove duplicate backups": firmware backups and exact copies go to the Recycle Bin.
     void RemoveDuplicateBackups(Action refill)
     {
@@ -1444,7 +1449,7 @@ class EmuForm : Form
                 if (drop.Count == 0) { Tell("Save Helper", "There are no duplicate backups."); return; }
                 long bytes = drop.Sum(p => p.Value);
                 string size = bytes >= (1L << 30) ? (bytes / 1073741824.0).ToString("0.0") + " GB" : Math.Max(1, bytes >> 20) + " MB";
-                if (Ask("Remove duplicate backups", "Move " + drop.Count + " backup" + (drop.Count == 1 ? "" : "s") + " you don't need (" + size + ") to the Recycle Bin?\r\n\r\nThese are firmware copies and exact copies of other backups. Backups with saves you might want are kept.", "Remove", "Cancel") != 0) return;
+                if (Ask("Remove duplicate backups", "Move " + drop.Count + " backup" + (drop.Count == 1 ? "" : "s") + " you don't need (" + size + ") to " + Bin + "?\r\n\r\nThese are firmware copies and exact copies of other backups. Backups with saves you might want are kept.", "Remove", "Cancel") != 0) return;
                 anyBusy = true; RefreshAll(); SetFooter("Removing duplicate backups...", Theme.Info);
                 ThreadPool.QueueUserWorkItem(delegate
                 {
@@ -1538,7 +1543,7 @@ class EmuForm : Form
             text("When sharing starts, saves that aren't used are kept here instead of being deleted. Restore (when you stop sharing) uses them too.", null, Theme.Muted);
             Button dedupe = new Button(); dedupe.Text = "Remove duplicate backups"; dedupe.SetBounds(x, y, D(220), D(34)); host.Controls.Add(dedupe);
             StyleButton(dedupe); dedupe.BackColor = Theme.Window;
-            tips.SetToolTip(dedupe, "Moves backups you don't need (firmware, and exact copies) to the Recycle Bin");
+            tips.SetToolTip(dedupe, "Moves backups you don't need (firmware, and exact copies) to " + Bin);
             dedupe.Click += delegate { RemoveDuplicateBackups(refill); };
             y += D(44);
             foreach (var a in aside.Take(20))
@@ -1571,7 +1576,8 @@ class EmuForm : Form
             "When sharing starts: saves for games the shared saves don't have are added to them. If two emulators have a save for the same game, the ticked one's is used and the other goes to Backups.",
             "When sharing stops: \"Keep latest\" gives every emulator a copy of the latest saves. \"Restore\" gives the others back the saves they had before. The ticked one always keeps the latest.",
             "Updating an emulator never touches its saves. Older versions (in Older builds) don't contain saves.",
-            "Uninstalling the manager keeps your emulators and saves. Anything the manager removes goes to the Recycle Bin.",
+            Core.Portable ? "Everything is in the manager's folder: copy the whole folder to back it up or take it to another PC. Anything the manager removes goes to its " + Core.REMOVED + " folder."
+                          : "Uninstalling the manager keeps your emulators and saves. Anything the manager removes goes to the Recycle Bin.",
         })
             text("- " + line, null, Theme.Text);
 
@@ -1582,9 +1588,17 @@ class EmuForm : Form
         Button again = new Button(); again.Text = "Check again"; again.SetBounds(x, y, D(130), D(34)); host.Controls.Add(again);
         StyleButton(again); again.BackColor = Theme.Window;
         again.Click += delegate { refill(); };
-        LinkLabel bin = new LinkLabel(); bin.Text = "Open the Recycle Bin"; bin.SetBounds(x + D(146), y + D(8), D(220), D(22)); bin.BackColor = Theme.Window;
+        LinkLabel bin = new LinkLabel(); bin.Text = Core.Portable ? "Open " + Core.REMOVED : "Open the Recycle Bin"; bin.SetBounds(x + D(146), y + D(8), D(220), D(22)); bin.BackColor = Theme.Window;
         bin.LinkColor = bin.ActiveLinkColor = bin.VisitedLinkColor = Theme.Accent; bin.LinkBehavior = LinkBehavior.HoverUnderline;
-        bin.LinkClicked += delegate { try { Process.Start("explorer.exe", "shell:RecycleBinFolder"); } catch { } };
+        bin.LinkClicked += delegate
+        {
+            try
+            {
+                if (Core.Portable) { Directory.CreateDirectory(UserData.RemovedRoot); Explore(UserData.RemovedRoot); }
+                else Process.Start("explorer.exe", "shell:RecycleBinFolder");
+            }
+            catch { }
+        };
         host.Controls.Add(bin);
         y += D(50);
         Label pad = new Label(); pad.SetBounds(x, y, 1, 1); host.Controls.Add(pad);   // room at the bottom when scrolling
@@ -2259,7 +2273,7 @@ class EmuForm : Form
         int week = r != null ? r.Days.Sum() : 0;
         Txt(updLine, r == null ? "" : week == 0 ? "No new versions this week" : week == 1 ? "1 new version this week" : week + " new versions this week");
         // manager
-        Txt(mgrText, "Version " + Core.AppVersion);
+        Txt(mgrText, "Version " + Core.AppVersion + (Core.Portable ? " (portable)" : ""));
         mgrChip.Visible = mgrChecked && !(anyBusy && mgrRel != null);
         Txt(mgrChip, mgrRel != null ? "Update to " + mgrVer : "Latest");
         roles[mgrChip] = mgrRel != null ? "info" : "success";
@@ -2480,7 +2494,9 @@ class EmuForm : Form
         }
         else c.Data.Text = shared.Count > 0 ? "Shared with your other emulators: " + string.Join(", ", shared.Select(i => i.Label.ToLower())) : "";
         c.Share.Checked = hostDef == d;
-        c.Share.Enabled = !c.Busy && !IsBusy && (hostDef == null || hostDef == d || !hostHere);   // one at a time: the others are greyed out
+        c.Share.Enabled = !c.Busy && !IsBusy && (hostDef == null || hostDef == d || !hostHere) && UserData.CanShare;   // one at a time: the others are greyed out
+        if (!UserData.CanShare && portable) { c.Share.Checked = false; c.Data.Text = "Not sharing: this drive can't share saves (most USB sticks can't)."; }
+        tips.SetToolTip(c.Share, UserData.CanShare ? "Your other emulators use this one's keys, firmware and saves, so progress shows up in all of them. Their own data is kept as a backup." : UserData.NO_SHARE);
         c.NextKind = !installed || c.Busy ? null : !portable ? "portable" : NoReminder(d) ? null : !HasKeys(d) ? "keys" : !HasFirmware(d) ? "firmware" : null;
         c.Next.Text = c.NextKind == "portable" ? "Keep its saves in its own folder" : c.NextKind == "keys" ? "Next: add your keys" : c.NextKind == "firmware" ? "Next: add firmware" : "";
 
@@ -2565,7 +2581,7 @@ class EmuForm : Form
                 if (Core.Cfg.Sandbox) { SetFooter("Test copy: the update was downloaded, Setup was not started.", Theme.Muted); Explore(Path.GetDirectoryName(setup)); return; }
                 try
                 {
-                    Process.Start(new ProcessStartInfo(setup, "--update \"" + Core.Home.TrimEnd('\\') + "\"") { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(setup) });
+                    Process.Start(new ProcessStartInfo(setup, "--update \"" + (Core.Home.TrimEnd('\\').EndsWith(":") ? Core.Home.TrimEnd('\\') + "\\." : Core.Home.TrimEnd('\\')) + "\"") { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(setup) });
                     Log("Started the manager's setup; closing so it can update.");
                     Close();
                 }
@@ -2696,19 +2712,22 @@ class EmuForm : Form
              delegate { RefreshAll(); if ((!keys && !HasKeys(d)) || (!fw && !HasFirmware(d))) Fail(c, "Nothing could be copied. Add them by hand."); });
     }
 
-    void MakePortable(EmuCard c)
+    // thenLaunch: asked by Launch in the portable edition, where an emulator must keep its saves in its own folder (else
+    // they'd go to this PC's %APPDATA% and stay behind): it launches once that's done.
+    void MakePortable(EmuCard c, bool thenLaunch = false)
     {
         if (IsBusy) { PleaseWait(); return; }
         EmuDef d = c.Def;
         string from = UserData.AppDataSource(d);
+        string why = thenLaunch ? "The portable manager keeps " + d.Name + "'s saves in its own folder, so they go wherever this folder goes.\r\n\r\n" : "";
         if (from != null)
         {
-            string q = "Copy " + d.Name + "'s saves and settings into its own folder? The originals stay where they are." +
+            string q = why + "Copy " + d.Name + "'s saves and settings from this PC into its own folder? The originals stay where they are." +
                        (UserData.SourceIsShared(d, from) ? "\r\n\r\nThey are in the \"" + Path.GetFileName(from) + "\" folder, which other emulators may use too." : "");
             if (Ask("Keep saves in its own folder", q, "Copy", "Cancel") != 0) return;
         }
-        else if (Ask("Keep saves in its own folder", "No saves or settings were found for " + d.Name + ". Give it an empty folder of its own? It will start like a new install.", "Continue", "Cancel") != 0) return;
-        Work(c, "Copying saves and settings", (log, prog) => { log(UserData.MakePortable(d, from, log)); }, delegate { JoinSharing(c); });
+        else if (Ask("Keep saves in its own folder", why + "No saves or settings were found for " + d.Name + ". Give it an empty folder of its own? It will start like a new install.", "Continue", "Cancel") != 0) return;
+        Work(c, "Copying saves and settings", (log, prog) => { log(UserData.MakePortable(d, from, log)); }, delegate { JoinSharing(c); if (thenLaunch) BeginInvoke((MethodInvoker)delegate { LaunchNow(c); }); });
     }
 
     // While sharing is on, an emulator that isn't linked yet (just added, or now keeping its own data) joins it without
@@ -2718,7 +2737,7 @@ class EmuForm : Form
     readonly Dictionary<string, string> joinWhy = new Dictionary<string, string>();   // id -> why it didn't join (plain words); retried on Activated
     void JoinSharing(EmuCard c)
     {
-        if (Core.Cfg.ShareHost == null) return;
+        if (Core.Cfg.ShareHost == null || !UserData.CanShare) return;   // a drive without links (FAT32 / exFAT): sharing waits for one that has them
         List<EmuCard> need = cards.Where(k => (c == null || k == c) && Installed(k.Def) && UserData.IsPortable(k.Def) && !joinWhy.ContainsKey(k.Def.Id) &&
                                               UserData.HostItems.Any(i => UserData.StateOf(k.Def, i) != UserData.State.On)).ToList();
         if (need.Count == 0) return;
@@ -2780,6 +2799,7 @@ class EmuForm : Form
     void ToggleShare(EmuCard c)
     {
         if (IsBusy) { PleaseWait(); return; }
+        if (!UserData.CanShare) { Tell("Share data", UserData.NO_SHARE); RefreshAll(); return; }
         EmuDef d = c.Def;
         List<EmuCard> inst = cards.Where(k => Installed(k.Def) && UserData.IsPortable(k.Def)).ToList();
         EmuDef host = Core.Cfg.ShareHost == null ? null : Core.Cfg.Emulators.FirstOrDefault(x => x.Id == Core.Cfg.ShareHost);
@@ -2930,7 +2950,7 @@ class EmuForm : Form
             cand = cand.OrderByDescending(p => UserData.LastChanged(it, p.Value != null ? p.Value.Def : null)).ToList();
             List<string> opts = cand.Select((p, i) => "Use " + p.Key + (i == 0 ? " (newest)" : "")).ToList();
             opts.Add("Cancel");
-            int r = Ask("Shared data", "Your emulators have different " + it.Label.ToLower() + ". Which should all of them use?\r\n\r\nThe others are kept in the Shared data folder (firmware goes to the Recycle Bin).", opts.ToArray());
+            int r = Ask("Shared data", "Your emulators have different " + it.Label.ToLower() + ". Which should all of them use?\r\n\r\nThe others are kept in the Shared data folder (firmware goes to " + Bin + ").", opts.ToArray());
             if (r < 0 || r == opts.Count - 1) return;
             keep[it.Key] = cand[r].Value;
         }
@@ -3777,7 +3797,17 @@ class EmuForm : Form
     public static string LogPath { get { try { Directory.CreateDirectory(Core.DataDir); } catch { } return Path.Combine(Core.DataDir, "manager.log"); } }
     public static void FileLog(string s)
     {
-        try { File.AppendAllText(LogPath, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + s + "\r\n"); } catch { }
+        try
+        {
+            string f = LogPath;
+            if (File.Exists(f) && new FileInfo(f).Length > (2 << 20))
+            {
+                string old = Path.Combine(Path.GetDirectoryName(f), "manager.old.log");
+                try { if (File.Exists(old)) File.Delete(old); File.Move(f, old); } catch { }
+            }
+            File.AppendAllText(f, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + s + "\r\n");
+        }
+        catch { }
     }
     void Log(string s)
     {
@@ -4068,12 +4098,13 @@ class EmuForm : Form
     [STAThread]
     static int Main(string[] args)
     {
-        string cfg = Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), "emulators.json");
+        string exeDir = Path.GetDirectoryName(Application.ExecutablePath);
+        string cfg = Path.Combine(exeDir, "emulators.json");
         List<string> cli = null; string logFile = null;
-        bool sandbox = false;
+        bool sandbox = false, custom = false;
         for (int i = 0; i < args.Length; i++)
         {
-            if (args[i] == "--config" && i + 1 < args.Length) cfg = args[++i];
+            if (args[i] == "--config" && i + 1 < args.Length) { cfg = args[++i]; custom = true; }
             else if (args[i] == "--sandbox" && i + 1 < args.Length)
             {   // test environment: a folder of its own, starting like a brand-new user's (no builds, no games folder)
                 string dir = Path.GetFullPath(args[++i]);
@@ -4086,6 +4117,56 @@ class EmuForm : Form
             else if (args[i] == "--demo" && i + 1 < args.Length) EmuForm.Demo = args[++i];
             else if (args[i] == "--cli") cli = new List<string>();
             else if (cli != null) cli.Add(args[i]);
+        }
+        Mutex one = null;
+        if (sandbox || custom) Core.PortableAllowed = false;
+        else
+        {
+            // opened from inside the zip (Windows runs it from a temp folder): everything, saves too, would land in a
+            // folder Windows cleans up
+            string tmp = Path.GetFullPath(Path.GetTempPath()).TrimEnd('\\') + "\\";
+            if ((exeDir + "\\").StartsWith(tmp, StringComparison.OrdinalIgnoreCase) || exeDir.IndexOf(".zip\\", StringComparison.OrdinalIgnoreCase) >= 0 || exeDir.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                if (cli != null) return 2;
+                MessageBox.Show("Extract the whole zip first (right-click it, then Extract All), then open EmuManager.exe from the extracted folder.", APP, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return 2;
+            }
+            Core.Portable = File.Exists(Path.Combine(exeDir, Core.PORTABLE_MARK));
+            if (Core.Portable && Path.GetPathRoot(exeDir + "\\").TrimEnd('\\') == exeDir.TrimEnd('\\') && cli == null)
+            {
+                MessageBox.Show("Put the portable manager in a folder of its own (for example " + exeDir.TrimEnd('\\') + "\\NS2 Emulator Manager), not straight on the drive, then open it from there.", APP, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return 2;
+            }
+            // a folder Setup installed into stays the installed manager, even with a portable.txt in it
+            if (InstalledHere(exeDir)) { Core.Portable = false; Core.PortableAllowed = false; }
+        }
+        if (cli == null)
+        {
+            string home = Path.GetDirectoryName(Path.GetFullPath(cfg));
+            try
+            {   // can it save here? (Program Files, a CD, a write-protected stick)
+                Directory.CreateDirectory(home);
+                string probe = Path.Combine(home, ".write-test");
+                File.WriteAllText(probe, ""); File.Delete(probe);
+            }
+            catch
+            {
+                MessageBox.Show("The manager can't save files in " + home + ".\r\n\r\nMove its folder somewhere you can save files (not Program Files or a write-protected drive), then open it again.", APP, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return 2;
+            }
+            // one window per folder: two copies working on the same emulators would get in each other's way
+            string id;
+            using (System.Security.Cryptography.SHA1 h = System.Security.Cryptography.SHA1.Create())
+                id = BitConverter.ToString(h.ComputeHash(System.Text.Encoding.UTF8.GetBytes(home.TrimEnd('\\').ToLowerInvariant()))).Replace("-", "");
+            one = new Mutex(false, @"Local\NS2EmulatorManager-" + id);
+            bool mine;
+            try { mine = one.WaitOne(10000); } catch (AbandonedMutexException) { mine = true; }   // a copy that crashed
+            if (!mine)
+            {   // the one that's open: to the front
+                foreach (Process p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(Application.ExecutablePath)))
+                    try { if (p.Id != Process.GetCurrentProcess().Id && p.MainWindowHandle != IntPtr.Zero) Native.Raise(p.MainWindowHandle); } catch { } finally { p.Dispose(); }
+                return 3;
+            }
         }
         try
         {
@@ -4103,7 +4184,22 @@ class EmuForm : Form
         Application.SetCompatibleTextRenderingDefault(false);
         Theme.Set(Core.Cfg.Colors);
         Application.Run(new EmuForm());
+        GC.KeepAlive(one);
         return 0;
+    }
+
+    // Did Setup install the manager into this folder (its Apps & features entry points here)?
+    static bool InstalledHere(string dir)
+    {
+        try
+        {
+            using (Microsoft.Win32.RegistryKey k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\Switch2EmulatorManager"))
+            {
+                string d = k == null ? null : k.GetValue("InstallLocation") as string;
+                return !string.IsNullOrEmpty(d) && string.Equals(Path.GetFullPath(d).TrimEnd('\\'), Path.GetFullPath(dir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        catch { return false; }
     }
 
     // --cli check | update ID | restore ID   (several in a row are fine). Output to --log FILE and manager.log.

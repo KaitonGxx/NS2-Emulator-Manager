@@ -34,6 +34,85 @@ public static class UserData
     public const string SHARED = "Shared data";
     public const string SET_ASIDE = "Set aside";
     public static string SharedRoot { get { return Path.Combine(Core.Home, SHARED); } }
+    public static string RemovedRoot { get { return Path.Combine(Core.Home, Core.REMOVED); } }
+
+    // ---- can this drive share? Sharing links folders (NTFS junctions); FAT32 / exFAT drives (most USB sticks) can't.
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern bool GetVolumeInformation(string root, StringBuilder name, int nameSize, out uint serial, out uint maxLen, out uint flags, StringBuilder fs, int fsSize);
+    static string canShareFor; static bool canShare;
+    public static bool CanShare
+    {
+        get
+        {
+            if (!Core.Portable) return true;   // installed: CheckLinks' test link decides, as before
+            string home = Core.Home ?? "";
+            if (canShareFor == home) return canShare;
+            bool ok = true;
+            try
+            {
+                string root = Path.GetPathRoot(Path.GetFullPath(home));
+                if (!root.EndsWith("\\")) root += "\\";
+                uint serial, maxLen, flags; StringBuilder fs = new StringBuilder(64);
+                if (GetVolumeInformation(root, null, 0, out serial, out maxLen, out flags, fs, fs.Capacity))
+                    ok = (flags & 0x80) != 0;   // FILE_SUPPORTS_REPARSE_POINTS
+            }
+            catch { }
+            canShareFor = home; canShare = ok;
+            return ok;
+        }
+    }
+    public const string NO_SHARE = "This drive can't share saves between emulators (most USB sticks can't). Each emulator keeps its own.";
+
+    // A shared-data link that points into "...\Shared data\<item>" somewhere other than this folder's Shared data (the
+    // folder was moved to another drive letter or copied): pointed at this folder's own copy, when it has one. Only the
+    // link changes, never any data. Done at start, before anything launches or joins sharing.
+    public static void RepairLinks(string oldHome, Action<string> log)
+    {
+        if (Core.Cfg == null || !Directory.Exists(SharedRoot)) return;
+        string mine = Full(SharedRoot);
+        string oldShared = Full(Path.Combine(oldHome, SHARED)) + "\\";
+        foreach (EmuDef e in Core.Cfg.Emulators)
+        {
+            if (!IsPortable(e)) continue;
+            foreach (Item it in Items)
+                foreach (string rel in it.Paths)
+                {
+                    string b = Path.Combine(UserDir(e), rel), t = JunctionTarget(b);
+                    if (t == null || t.StartsWith("(")) continue;
+                    string want = Path.Combine(mine, rel);
+                    if (string.Equals(Full(t), Full(want), StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!Full(t).EndsWith("\\" + SHARED + "\\" + rel, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(want)) continue;
+                    // a live link into some other manager's Shared data is left alone (joining sharing handles that)
+                    bool fromOld = (Full(t) + "\\").StartsWith(oldShared, StringComparison.OrdinalIgnoreCase);
+                    if (!fromOld && Directory.Exists(t)) continue;
+                    try { RemoveJunction(b); }
+                    catch (Exception ex) { log(e.Name + ": couldn't fix the " + it.Label.ToLower() + " link: " + ex.Message); continue; }
+                    try { CreateJunction(b, want); log(e.Name + ": its " + it.Label.ToLower() + " link now points at this folder's Shared data (was " + t + ")."); }
+                    catch (Exception ex)
+                    {   // the old link back, so Launch says what's wrong instead of the emulator starting with nothing
+                        log(e.Name + ": couldn't fix the " + it.Label.ToLower() + " link: " + ex.Message);
+                        try { CreateJunction(b, t); } catch { }
+                    }
+                }
+        }
+    }
+
+    // A link in e's user folder that leads nowhere, or out of the manager's folder in the portable edition (its saves
+    // would be on another drive): null when there's none.
+    public static string BrokenLink(EmuDef e)
+    {
+        if (!IsPortable(e)) return null;
+        string home = Full(Core.Home) + "\\";
+        foreach (Item it in Items)
+            foreach (string rel in it.Paths)
+            {
+                string t = JunctionTarget(Path.Combine(UserDir(e), rel));
+                if (t == null || t.StartsWith("(")) continue;
+                if (!Directory.Exists(t)) return e.Name + "'s " + it.Label.ToLower() + " are linked to a folder that isn't there (" + t + "). Nothing was changed.";
+                if (Core.Portable && !Full(t).StartsWith(home, StringComparison.OrdinalIgnoreCase)) return e.Name + "'s " + it.Label.ToLower() + " are linked outside the portable folder (" + t + "). Nothing was changed.";
+            }
+        return null;
+    }
     static string UserDir(EmuDef e) { return Path.Combine(e.Dir, "user"); }
     static string Full(string p) { return Path.GetFullPath(p).TrimEnd('\\'); }
 
@@ -256,6 +335,7 @@ public static class UserData
     // anything is moved.
     static void CheckLinks(EmuDef e)
     {
+        if (!CanShare) throw new Exception(NO_SHARE);
         string probe = Path.Combine(UserDir(e), ".linktest");
         try
         {
@@ -368,6 +448,14 @@ public static class UserData
         {
             string bin = Path.Combine(Core.Home, ".recycled", DateTime.Now.ToString("HHmmssfff") + " " + Path.GetFileName(dir));
             MoveTree(dir, bin, log);
+        }
+        else if (Core.Portable)
+        {   // a USB stick has no Recycle Bin (it would delete for good): the portable folder's own "Removed items" instead
+            string name = DateTime.Now.ToString("yyyy-MM-dd HHmmss") + " " + Path.GetFileName(dir), bin = Path.Combine(RemovedRoot, name);
+            for (int i = 2; Directory.Exists(bin) || File.Exists(bin); i++) bin = Path.Combine(RemovedRoot, name + " " + i);
+            MoveTree(dir, bin, log);
+            log("Moved to " + Core.REMOVED + ": " + dir);
+            return;
         }
         else Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(dir, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
         log("Moved to the Recycle Bin: " + dir);
@@ -495,6 +583,8 @@ public static class UserData
     // Before launching e: another open emulator that uses the same saves (or mods) would write the same files.
     public static string LaunchProblem(EmuDef e)
     {
+        string broken = BrokenLink(e);
+        if (broken != null) return broken;
         foreach (Item it in Items.Where(i => i.Key == "saves" || i.Key == "mods"))
             foreach (EmuDef x in Core.Cfg.Emulators)
                 if (x != e && SameData(e, x, it) && Core.Running(x).Count > 0)
@@ -961,10 +1051,14 @@ public static class UserData
 
     public static bool HasFiles(string d)
     {
-        if (!Directory.Exists(d)) return false;
-        if (Directory.GetFiles(d).Length > 0) return true;
-        foreach (string s in Directory.GetDirectories(d)) if (!IsReparse(s) && HasFiles(s)) return true;
-        return false;
+        try
+        {
+            if (!Directory.Exists(d)) return false;
+            if (Directory.GetFiles(d).Length > 0) return true;
+            foreach (string s in Directory.GetDirectories(d)) if (!IsReparse(s) && HasFiles(s)) return true;
+            return false;
+        }
+        catch (DirectoryNotFoundException) { return false; }   // a link whose folder is gone
     }
 
     static long[] Count(string d)

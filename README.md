@@ -51,6 +51,20 @@ Made by **Riskbreak** (Discord).
 
 It installs for your user only (no admin needed). Uninstall from **Settings > Apps**.
 
+### Portable version (no install)
+
+Want to keep everything on a USB stick, a games drive, or in one folder you can copy? Download
+`NS2EmulatorManager-Portable.zip` instead, extract it where you want it, and open **EmuManager.exe**.
+
+- **Nothing is added to Windows:** no Apps & features entry, no shortcuts.
+- **Everything stays in that folder:** the manager's settings, your emulators and their saves. Copy the whole folder to
+  back it up or take it to another PC. It finds its way again even if the drive letter changes.
+- **Updates itself** like the installed version, and still adds nothing to Windows.
+- **Removed things** go to the folder's own `Removed items` folder (USB sticks have no Recycle Bin).
+- **USB sticks formatted as FAT32 or exFAT** (most of them) can't share saves between emulators; each one keeps its
+  own. NTFS drives can.
+- Keep `portable.txt` next to `EmuManager.exe`: it's what makes it portable.
+
 ## Keys and firmware
 
 The emulators need keys and firmware **from your own Switch**. This tool doesn't download or include them.

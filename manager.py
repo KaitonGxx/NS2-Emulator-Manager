@@ -108,6 +108,39 @@ def cmd_installer(_):
     if os.path.exists(old):
         os.remove(old)
     print('installer', out, '%.0f KB' % (os.path.getsize(out) / 1024), r.stdout.strip() or 'no warnings')
+    return cmd_portable_zip(stage)
+
+
+def cmd_portable_zip(stage):
+    """dist\\NS2EmulatorManager-Portable.zip = the same EmuManager.exe + portable.txt (the marker: everything stays in
+    its folder, nothing is installed) + README.txt. No Setup.exe in it: a portable copy updates through the installer
+    zip's Setup, which sees portable.txt and only replaces the exe. Made by 'installer', so a release always has both."""
+    import shutil, zipfile
+    pstage = os.path.join(HERE, 'dist', 'NS2EmulatorManager-Portable')
+    if os.path.isdir(pstage):
+        shutil.rmtree(pstage)
+    os.makedirs(pstage)
+    shutil.copyfile(os.path.join(stage, 'EmuManager.exe'), os.path.join(pstage, 'EmuManager.exe'))
+    with open(os.path.join(pstage, 'portable.txt'), 'w', newline='\r\n') as f:   # same words as Core.PortableNote
+        f.write('This folder is the portable NS2 Emulator Manager.\n'
+                'Everything it uses stays in this folder: your emulators, their saves, and the manager\'s settings.\n'
+                'Keep this file next to EmuManager.exe. To move or back up everything, copy the whole folder.\n')
+    with open(os.path.join(pstage, 'README.txt'), 'w', newline='\r\n') as f:
+        f.write('NS2 Emulator Manager (portable)\n\n'
+                '1. Extract this whole zip (right-click > Extract All) to where you want to keep it:\n'
+                '   a folder on your PC, a games drive, or a USB stick.\n'
+                '2. Open EmuManager.exe from the extracted folder.\n\n'
+                'Nothing is installed in Windows. Your emulators and their saves stay in this folder,\n'
+                'so you can copy the whole folder to back it up or use it on another PC.\n'
+                'Keep portable.txt next to EmuManager.exe.\n\n'
+                'USB sticks formatted as FAT32 or exFAT (most of them) can\'t share saves between emulators;\n'
+                'each emulator keeps its own. NTFS drives can.\n\n'
+                'If Windows says it protected your PC: click "More info", then "Run anyway".\n')
+    out = os.path.join(HERE, 'dist', 'NS2EmulatorManager-Portable.zip')
+    with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+        for n in ('EmuManager.exe', 'portable.txt', 'README.txt'):
+            z.write(os.path.join(pstage, n), 'NS2EmulatorManager-Portable/' + n)
+    print('portable', out, '%.0f KB' % (os.path.getsize(out) / 1024))
     return 0
 
 
