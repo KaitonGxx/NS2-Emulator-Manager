@@ -1,57 +1,71 @@
-# NS2 Emulator Manager
+# 🎮 NS2 Emulator Manager
+
+[![Latest release](https://img.shields.io/github/v/release/KaitonGxx/NS2-Emulator-Manager?label=release)](https://github.com/KaitonGxx/NS2-Emulator-Manager/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/KaitonGxx/NS2-Emulator-Manager/total?label=downloads)](https://github.com/KaitonGxx/NS2-Emulator-Manager/releases)
+[![License: GPL-3.0](https://img.shields.io/github/license/KaitonGxx/NS2-Emulator-Manager)](LICENSE)
+[![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white)](#-install)
 
 Install, update and launch Switch 2 emulators on Windows, from one small window.
 
+Tick the emulators you want and click Install. From then on, every update is one click, your saves stay where they
+are, and you can go back to any older version whenever you like. It handles Eglantine Main, PokeDinner and Lichii out
+of the box, and any other fork from a GitHub or Gitea link.
+
 Made by **Riskbreak** (Discord).
+
+> **AI disclosure:** NS2 Emulator Manager was written with Claude, Anthropic's AI assistant, under the direction of its
+> maintainer, who tested the changes on Windows.
 
 ![The main window with three emulators installed](docs/main.png)
 
-## What it does
+## ✨ Features
 
+**📥 Install and update**
 - **Installs** Eglantine Main, PokeDinner and Lichii, or any other fork from a GitHub or Gitea link.
 - **Updates** with one click. The version you replace is kept, so you can go back.
 - **Choose any version** from a list of every release (each card's "..." menu).
-- **Keeps your saves safe.** Each emulator uses its own folder; nothing goes in `%APPDATA%`.
-- **Share data with other emulators:** tick it on one emulator and all of them use its keys, firmware and saves, so
-  your progress follows you. Saves for different games are combined; nothing is deleted. When you stop, choose
-  whether the others keep the latest saves or restore their own.
-- **Save Helper** shows where every emulator's saves are, the backups, and how to back them up.
 - **Finds emulators you already have**, so nothing is downloaded twice.
 - **Updates itself** from this page when a new version is out.
 
-## Screenshots
+**💾 Your saves, kept safe**
+- **Each emulator uses its own folder.** Nothing goes in `%APPDATA%`.
+- **Share data with other emulators:** tick it on one emulator and all of them use its keys, firmware and saves, so
+  your progress follows you. Saves for different games are combined, and nothing is deleted. When you stop, choose
+  whether the others keep the latest saves or restore their own.
+- **Save Helper** shows where every emulator's saves are, the backups, and how to back them up.
 
-**First start:** tick the emulators you want, then click Install.
+**🎨 Make it yours**
+- **16 themes** from the Themes button at the top.
+- **Each emulator's own logo** on its card.
 
-![Welcome window](docs/welcome.png)
+**🎒 Portable if you want it**
+- A **no-install version** that keeps everything in one folder, for a USB stick, a games drive or a backup you can
+  copy. See [Portable version](#-portable-version-no-install).
 
-**Already have them?** Emulators that are already in the folder are added without downloading them again.
+## 📸 Screenshots
 
-![Welcome window with emulators already installed](docs/welcome-already-installed.png)
+| First start | Already have them? |
+|:---:|:---:|
+| <img src="docs/welcome.png" alt="Welcome window: tick the emulators you want, then click Install"> | <img src="docs/welcome-already-installed.png" alt="Emulators already in the folder are added without downloading them again"> |
+| **Choose any version** | **16 themes** |
+| <img src="docs/choose-version.png" alt="The list of every release, from each card's ... menu"> | <img src="docs/themes.png" alt="The Themes window"> |
+| **No emulators yet** | **Setup** |
+| <img src="docs/no-emulators.png" alt="The main window with no emulators: one click to pick some"> | <img src="docs/setup.png" alt="The setup window"> |
 
-**Choose any version** from each emulator's "..." menu.
+## 📲 Install
 
-![Choose version list](docs/choose-version.png)
-
-**Pick your colours** from 16 themes with the Themes button.
-
-![Themes window](docs/themes.png)
-
-**No emulators yet:** one click to pick some.
-
-![Main window with no emulators](docs/no-emulators.png)
-
-## Install
-
-![Setup](docs/setup.png)
-
-1. Go to [Releases](../../releases) and download the latest `NS2EmulatorManager.zip`.
+1. Go to [Releases](https://github.com/KaitonGxx/NS2-Emulator-Manager/releases/latest) and download the latest
+   `NS2EmulatorManager.zip`.
 2. Extract the whole zip (right-click it, then **Extract All**).
 3. Run **Setup.exe** from the extracted folder.
 
 It installs for your user only (no admin needed). Uninstall from **Settings > Apps**.
 
-### Portable version (no install)
+> [!TIP]
+> **"Windows protected your PC"?** Click **More info**, then **Run anyway**. Windows shows this for new programs that
+> aren't widely downloaded yet.
+
+### 🎒 Portable version (no install)
 
 Want to keep everything on a USB stick, a games drive, or in one folder you can copy? Download
 `NS2EmulatorManager-Portable.zip` instead, extract it where you want it, and open **EmuManager.exe**.
@@ -61,27 +75,33 @@ Want to keep everything on a USB stick, a games drive, or in one folder you can 
   back it up or take it to another PC. It finds its way again even if the drive letter changes.
 - **Updates itself** like the installed version, and still adds nothing to Windows.
 - **Removed things** go to the folder's own `Removed items` folder (USB sticks have no Recycle Bin).
-- **USB sticks formatted as FAT32 or exFAT** (most of them) can't share saves between emulators; each one keeps its
-  own. NTFS drives can.
-- Keep `portable.txt` next to `EmuManager.exe`: it's what makes it portable.
 
-## Keys and firmware
+> [!NOTE]
+> **USB sticks formatted as FAT32 or exFAT** (most of them) can't share saves between emulators, so each one keeps its
+> own. NTFS drives can.
 
-The emulators need keys and firmware **from your own Switch**. This tool doesn't download or include them.
+> [!IMPORTANT]
+> Keep `portable.txt` next to `EmuManager.exe`. It's what makes it portable.
+
+## 🔑 Keys and firmware
+
+> [!IMPORTANT]
+> The emulators need keys and firmware **from your own Switch**. This tool doesn't download or include them.
+
 Each emulator's card shows simple steps to add them.
 
-## Build from source
+## 🛠️ Build from source
 
 Needs Windows and Python 3 (it uses the C# compiler that comes with Windows):
 
 ```
 python manager.py build        # builds EmuManager.exe
-python manager.py installer    # builds dist\NS2EmulatorManager.zip (Setup.exe + EmuManager.exe)
+python manager.py installer    # builds dist\NS2EmulatorManager.zip and dist\NS2EmulatorManager-Portable.zip
 ```
 
 The icon is drawn from `src\icon.html`. To redraw it, run `python src\make_icon.py`, which needs Microsoft Edge and Pillow.
 
-## Credits
+## 🙏 Credits
 
 - The emulators are made and hosted by their own projects:
   [Eglantine](https://github.com/Eglantine-Community/Eglantine),
@@ -91,6 +111,8 @@ The icon is drawn from `src\icon.html`. To redraw it, run `python src\make_icon.
 - The emulator logos on the cards belong to their projects: Eglantine's flower (PokeDinner's badge adds a ball to it)
   and Lichii's lychee.
 
-## License
+## 📜 License
 
-GPL-3.0. See [LICENSE](LICENSE).
+NS2 Emulator Manager is free software, released under the [GNU General Public License v3.0](LICENSE).
+
+It isn't affiliated with or endorsed by Nintendo or any of the emulator projects above.
