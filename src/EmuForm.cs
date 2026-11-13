@@ -1648,7 +1648,7 @@ class EmuForm : Form
     // --demo NAME[:ID] (test environment only): opens one screen right away, for screenshots.
     public static string Demo;
     // ---- "What's new" once after the manager was updated
-    // DataDir\last-version.txt holds the version that last ran (and saw its notes). Without it (1.3.12 and older never
+    // DataDir\last-version.txt holds the version that last ran (and saw its notes). Without it (1.3.8 and older never
     // wrote it), the last start line in the log says which version ran before. Null: nothing to show (a new install).
     static string LastVersionFile { get { return Path.Combine(Core.DataDir, "last-version.txt"); } }
     static readonly System.Text.RegularExpressions.Regex StartLine = new System.Text.RegularExpressions.Regex(@"--- NS2 Emulator Manager (\d+\.\d+(?:\.\d+)?) started");

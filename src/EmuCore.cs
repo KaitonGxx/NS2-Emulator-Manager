@@ -234,7 +234,7 @@ public static class Core
             renamed = true;
         }
         foreach (EmuDef e in Cfg.Emulators) { string n = DisplayName(e); if (n != e.Name) { e.Name = n; renamed = true; } }
-        foreach (EmuDef e in Cfg.Emulators)   // lists saved before 1.3.10: which Switch each emulator is for
+        foreach (EmuDef e in Cfg.Emulators)   // lists saved by 1.3.8 and older: which Switch each emulator is for
             if (e.SwitchVersion != 1 && e.SwitchVersion != 2 && !string.IsNullOrEmpty(e.Exe)) { e.SwitchVersion = DetectSwitch(e); renamed = true; }
         // lists saved before Switch 1 support had one games folder for every emulator: the Switch 1 emulators keep it
         // (nothing disappears from their game list); a separate Switch 1 folder can be chosen on the Games folder tile
@@ -1078,10 +1078,10 @@ public static class Core
     // folder, <install folder>\.manager-data (installed, portable and test environment alike): nothing in AppData.
     public const string OLDER = "Older builds";
     public static string DataDir { get { return Path.Combine(Home, ".manager-data"); } }
-    // Where 1.3.9 and older kept it (installed manager only).
+    // Where 1.3.8 and older kept it (installed manager only).
     public static string OldDataDir { get { string t = Environment.GetEnvironmentVariable("NS2_TEST_OLD_DATADIR"); if (!string.IsNullOrEmpty(t) && Cfg != null && Cfg.Sandbox) return t; return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Switch2EmulatorManager"); } }
 
-    // The installed manager's first start after 1.3.9 (before its window shows, so it must be quick): the small files in
+    // The installed manager's first start after 1.3.8 (before its window shows, so it must be quick): the small files in
     // the old AppData folder (icons, known installs, the log) move into .manager-data. Downloaded zips, manager updates
     // and release lists can be hundreds of MB and a slow copy to another drive, and they're only kept to be downloaded
     // again later, so they're removed instead (the manager removes them itself after each install anyway).

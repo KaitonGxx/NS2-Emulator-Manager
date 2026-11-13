@@ -21,7 +21,7 @@ using Microsoft.Win32;
 
 static class SetupApp
 {
-    public const string APP = "NS2 Emulator Manager", VERSION = "1.3.16", PUBLISHER = "NS2 Emulator Manager";
+    public const string APP = "NS2 Emulator Manager", VERSION = "1.3.9", PUBLISHER = "NS2 Emulator Manager";
     public const string KEY = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Switch2EmulatorManager";
     public static string DesktopLnk { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "NS2 Emulator Manager.lnk"); } }
     public static string StartLnk { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "NS2 Emulator Manager.lnk"); } }
