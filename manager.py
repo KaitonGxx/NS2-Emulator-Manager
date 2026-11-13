@@ -38,7 +38,7 @@ def cmd_build(_):
             return 1
     out = os.path.join(HERE, 'EmuManager.next.exe')
     args = [CSC, '/nologo', '/target:winexe', '/platform:x64', '/optimize+', '/out:' + out,
-            '/r:System.Web.Extensions.dll', '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Core.dll', '/r:Microsoft.VisualBasic.dll',
+            '/r:System.Web.Extensions.dll', '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Core.dll', '/r:Microsoft.VisualBasic.dll', '/r:System.Management.dll',
             '/win32icon:' + ICO, '/resource:' + PNG + ',app.png', '/resource:' + ICO + ',app.ico']
     # the built-in emulators' own logos for their cards (src\badges\<id>.png -> resource badge-<id>.png)
     for f in sorted(os.listdir(os.path.join(SRC, 'badges'))):
@@ -89,7 +89,7 @@ def cmd_installer(_):
     os.makedirs(stage)
     shutil.copyfile(os.path.join(HERE, 'EmuManager.next.exe'), os.path.join(stage, 'EmuManager.exe'))
     args = [CSC, '/nologo', '/target:winexe', '/platform:x64', '/optimize+', '/out:' + os.path.join(stage, 'Setup.exe'), '/main:SetupApp',
-            '/r:System.Web.Extensions.dll', '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Core.dll', '/r:Microsoft.VisualBasic.dll',
+            '/r:System.Web.Extensions.dll', '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Core.dll', '/r:Microsoft.VisualBasic.dll', '/r:System.Management.dll',
             '/win32icon:' + ICO, '/resource:' + PNG + ',app.png', '/resource:' + ICO + ',app.ico', '/win32manifest:app.manifest',
             'SetupInfo.cs', 'Setup.cs', 'FolderPicker.cs', 'EmuCore.cs', 'UserData.cs', 'EmuForm.cs']
     r = subprocess.run(args, cwd=SRC, capture_output=True, text=True)

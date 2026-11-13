@@ -27,14 +27,23 @@ static class Theme
     {
         new[] { "purple",   "Purple",   "0e0b16", "1a1626", "211c30", "2d2640", "ece8f6", "9a93b0", "9b6bff", "e66bd6", "3b2266", "3a1d4f", "ffffff", "7fb3ff" },
         new[] { "lavender", "Lavender", "100e17", "1b1826", "221e30", "302a42", "f1edfb", "a59eba", "c4b5fd", "f0abfc", "2e2550", "3a2244", "1b1430", "93c5fd" },
+        new[] { "galaxy",   "Galaxy",   "0b0a1a", "15132b", "1b1836", "29244d", "eceaff", "9893c2", "7c6cff", "ff6ec7", "26205e", "4a1747", "ffffff", "5eead4" },
+        new[] { "royal",    "Royal",    "0d0a14", "181325", "1f1830", "2e2444", "f5f0ff", "a79dbd", "f4c542", "c79bff", "3d2f0a", "2f1d4f", "1a1204", "7dd3fc" },
         new[] { "midnight", "Midnight", "0a0c1a", "141830", "1a1f3d", "262c52", "e8ebff", "9097c0", "5566ff", "8b5cf6", "1e2766", "241a55", "ffffff", "38bdf8" },
         new[] { "ocean",    "Ocean",    "071118", "0f1d27", "142633", "1f3442", "e6f3f8", "8aa4b2", "2ec5d3", "3b82f6", "0f3b52", "10304a", "ffffff", "a78bfa" },
         new[] { "arctic",   "Arctic",   "0b1016", "141b24", "19222d", "26313f", "eef5fb", "94a3b4", "a5f3fc", "c7d2fe", "163243", "1f2547", "0b1620", "fda4af" },
+        new[] { "sky",      "Sky",      "0a1016", "121c26", "17232f", "233243", "eaf4fd", "90a5b8", "7dd3fc", "a5b4fc", "123247", "22284f", "0b1a26", "fbcfe8" },
         new[] { "neon",     "Neon",     "0a0a12", "13131f", "191928", "262638", "f0f0ff", "9a9ab8", "00e5ff", "ff2bd6", "08343d", "3d0838", "0a0a12", "b6ff3b" },
+        new[] { "cyber",    "Cyber",    "0b0b0d", "151518", "1b1b20", "2a2a31", "f4f4ec", "a3a39a", "fcee0a", "00f0ff", "3d3a05", "053a3d", "0b0b0d", "ff3864" },
+        new[] { "aurora",   "Aurora",   "081214", "101d20", "152629", "21363a", "e6f7f5", "8fb0ac", "34d399", "a78bfa", "0f3d35", "2a1f4f", "06140f", "60a5fa" },
+        new[] { "mint",     "Mint",     "0a1110", "121c1a", "172421", "233431", "e9f7f2", "93ada5", "6ee7b7", "99f6e4", "12382c", "133a38", "06231a", "fda4af" },
         new[] { "emerald",  "Emerald",  "08110d", "111d18", "16261f", "22362d", "e7f6ef", "8fae9f", "22c55e", "a3e635", "123d28", "1f3a10", "0b1a10", "2dd4bf" },
         new[] { "matcha",   "Matcha",   "0d100b", "171c14", "1d2319", "2b3324", "eef3e6", "9fab92", "a7c957", "dde5b6", "26331a", "2f3416", "141a0c", "e9c46a" },
+        new[] { "retro",    "Retro",    "0e1209", "182012", "1e2817", "2c3a22", "e8f0d8", "9aa883", "9bbc0f", "c4d64b", "27360a", "1f2f0c", "0e1209", "e07a5f" },
         new[] { "amber",    "Amber",    "110e07", "1d1a10", "262114", "383020", "fbf5e6", "b5a888", "f5b301", "ff7a1a", "4a3608", "3d2008", "1a1204", "6ec1ff" },
         new[] { "sunset",   "Sunset",   "120c08", "1f1611", "281c15", "3a2a20", "f8efe8", "b39d8e", "ff8a3d", "ff4f8b", "4a2410", "4a1530", "ffffff", "ffd166" },
+        new[] { "peach",    "Peach",    "130e0c", "201815", "2a1f1b", "3c2d27", "fbefe9", "b8a096", "ffb4a2", "ffd6a5", "4a2a20", "4a3418", "2a140c", "a0c4ff" },
+        new[] { "coral",    "Coral",    "120c0c", "1f1615", "291c1b", "3b2a28", "faeeed", "b59d9a", "ff6f61", "ff9e7a", "4a1d18", "2e3a36", "2a0d0a", "2dd4bf" },
         new[] { "mocha",    "Mocha",    "120d0a", "1e1712", "271e18", "382b22", "f7efe8", "b09d8f", "d4a373", "e9c46a", "3d2617", "2f2416", "1a120c", "8ecae6" },
         new[] { "ruby",     "Ruby",     "12080a", "1f0f13", "291419", "3c1d24", "fbe9ec", "b6949b", "e11d48", "f43f5e", "4f0f1c", "3a0d22", "ffffff", "fbbf24" },
         new[] { "joycon",   "Joy-Con",  "100b0d", "1c1517", "24191c", "33262a", "f6ecee", "a8979b", "ff4d5e", "2f9bff", "4a1520", "12304f", "ffffff", "ffd23f" },
@@ -262,6 +271,7 @@ class Card : Panel, IBack
     public static float K = 1;        // screen scale (the main window sets it)
     public float Radius = 0;          // 0: the usual 14 (scaled)
     public Color Glow = Color.Empty;  // a soft glow in the top right corner
+    public Color Edge = Color.Empty;  // a coloured outline (the manager tile when an update is out)
     public Card() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true); }
     protected override void OnControlAdded(ControlEventArgs e) { base.OnControlAdded(e); e.Control.Top += Shift; }
     protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); Invalidate(); }
@@ -282,6 +292,7 @@ class Card : Panel, IBack
                 Theme.GlowAt(g, Glow, new RectangleF(Width - 36 * K - d / 2, 30 * K - d / 2, d, d), (int)(100 + 55 * h));
                 g.Restore(st);
             }
+        if (!Edge.IsEmpty) { Theme.FillRound(g, Color.Empty, Edge, new RectangleF(r.X + 0.5f, r.Y + 0.5f, r.Width - 1, r.Height - 1), Rad, 2 * K); return; }
         Color edge = h <= 0 ? Theme.Stroke : Theme.Blend(Theme.Stroke, Glow.IsEmpty ? Theme.StrokeStrong : Theme.Blend(Theme.StrokeStrong, Glow, 0.5), h);
         Theme.FillRound(g, Color.Empty, edge, r, Rad, 1);
     }
@@ -393,14 +404,54 @@ static class Anim
     }
 }
 
-// The picture faded out when the colours change: never takes the focus or the mouse.
+// The picture faded out when the colours change: never takes the focus or the mouse. A layered window that is given
+// the picture before it's shown (UpdateLayeredWindow), so its very first frame is the picture: a window that paints
+// itself after showing is white for a frame or two, which flashed the whole manager white.
 class FadeForm : Form
 {
-    public FadeForm() { SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true); }
+    [DllImport("user32.dll")] static extern bool UpdateLayeredWindow(IntPtr h, IntPtr dst, ref Point pos, ref Size size, IntPtr src, ref Point srcPos, int key, ref BLEND blend, int flags);
+    [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr h);
+    [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr h, IntPtr dc);
+    [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleDC(IntPtr dc);
+    [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr dc);
+    [DllImport("gdi32.dll")] static extern IntPtr SelectObject(IntPtr dc, IntPtr o);
+    [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr o);
+    [StructLayout(LayoutKind.Sequential, Pack = 1)] struct BLEND { public byte Op, Flags, Alpha, Format; }
+    IntPtr mem, bmp, old;
+    public FadeForm() { }
     protected override bool ShowWithoutActivation { get { return true; } }
     protected override CreateParams CreateParams
+    {   // no activate, tool window, mouse goes through, layered
+        get { CreateParams p = base.CreateParams; p.ExStyle |= 0x08000000 | 0x80 | 0x20 | 0x80000; return p; }
+    }
+    // The picture (the window's size), fully shown. Call before Show.
+    public void SetPicture(Bitmap pic)
     {
-        get { CreateParams p = base.CreateParams; p.ExStyle |= 0x08000000 | 0x80 | 0x20; return p; }   // no activate, tool window, mouse goes through
+        IntPtr screen = GetDC(IntPtr.Zero);
+        try
+        {
+            mem = CreateCompatibleDC(screen);
+            bmp = pic.GetHbitmap(Color.FromArgb(0));
+            old = SelectObject(mem, bmp);
+        }
+        finally { ReleaseDC(IntPtr.Zero, screen); }
+        Alpha(255);
+    }
+    // 255 = the picture fully covers the window, 0 = gone
+    public void Alpha(int a)
+    {
+        if (mem == IntPtr.Zero || IsDisposed) return;
+        Point pos = Location, zero = Point.Empty; Size size = Size;
+        BLEND b = new BLEND { Op = 0, Flags = 0, Alpha = (byte)Math.Max(0, Math.Min(255, a)), Format = 1 };   // AC_SRC_ALPHA: the cut corners are see-through
+        UpdateLayeredWindow(Handle, IntPtr.Zero, ref pos, ref size, mem, ref zero, 0, ref b, 2);   // ULW_ALPHA
+    }
+    protected override void OnPaintBackground(PaintEventArgs e) { }
+    protected override void OnPaint(PaintEventArgs e) { }
+    protected override void Dispose(bool disposing)
+    {
+        if (mem != IntPtr.Zero) { SelectObject(mem, old); DeleteDC(mem); mem = IntPtr.Zero; }
+        if (bmp != IntPtr.Zero) { DeleteObject(bmp); bmp = IntPtr.Zero; }
+        base.Dispose(disposing);
     }
 }
 
@@ -419,6 +470,11 @@ class MenuLook : ToolStripProfessionalRenderer
     {
         e.TextColor = e.Item.Enabled ? Theme.Text : Theme.Disabled;
         base.OnRenderItemText(e);
+    }
+    protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)   // the sub-menu arrow, readable on the dark menu
+    {
+        e.ArrowColor = e.Item != null && !e.Item.Enabled ? Theme.Disabled : Theme.Muted;
+        base.OnRenderArrow(e);
     }
 }
 
@@ -510,6 +566,142 @@ class CaptionButton : Control
 class QuietForm : Form
 {
     protected override bool ShowWithoutActivation { get { return EmuForm.Demo != null; } }
+}
+
+// Release notes drawn in the app's style: one rounded card per release, its headings in the accent, bullets with an
+// accent dot, **bold** kept. Made from GitHub's markdown; emoji are left out (Windows draws them as empty boxes here).
+class NotesView : Control
+{
+    class Run { public string Text; public bool Bold; }
+    class Block { public int Kind; public List<Run> Runs = new List<Run>(); }   // 0 paragraph, 1 bullet, 2 heading, 3 version
+    readonly List<List<Block>> cards = new List<List<Block>>();
+    public NotesView() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true); SetStyle(ControlStyles.Selectable, false); }
+
+    static readonly System.Text.RegularExpressions.Regex Link = new System.Text.RegularExpressions.Regex(@"!?\[([^\]]*)\]\([^)]*\)");
+    // Emoji and pictographs (and their joiners): GDI has no colour emoji.
+    public static string NoEmoji(string s)
+    {
+        System.Text.StringBuilder b = new System.Text.StringBuilder();
+        for (int i = 0; i < s.Length; i++)
+        {
+            char c = s[i];
+            if (char.IsHighSurrogate(c) && i + 1 < s.Length) { i++; continue; }
+            if (char.IsSurrogate(c) || c == '️' || c == '‍' || (c >= '⌀' && c <= '⏿') || (c >= '☀' && c <= '➿') || (c >= '⬀' && c <= '⯿')) continue;
+            b.Append(c);
+        }
+        return System.Text.RegularExpressions.Regex.Replace(b.ToString(), "  +", " ").Trim();
+    }
+    static List<Run> Runs(string s)
+    {
+        s = NoEmoji(Link.Replace(s, "$1").Replace("`", "").Replace("__", "**"));
+        List<Run> o = new List<Run>();
+        string[] parts = s.Split(new[] { "**" }, StringSplitOptions.None);
+        for (int i = 0; i < parts.Length; i++) if (parts[i].Length > 0) o.Add(new Run { Text = parts[i], Bold = i % 2 == 1 });
+        return o;
+    }
+    // One card: "Version X" (when there are several), then the notes. Sections on how to download it are left out:
+    // it's already installed.
+    public void Add(string version, string markdown)
+    {
+        List<Block> c = new List<Block>();
+        if (version != null) { Block vb = new Block { Kind = 3 }; vb.Runs.Add(new Run { Text = "Version " + version, Bold = true }); c.Add(vb); }
+        bool skip = false;
+        foreach (string raw in (markdown ?? "").Replace("\r", "").Split('\n'))
+        {
+            string t = raw.Trim();
+            if (t.StartsWith("#"))
+            {
+                string h = NoEmoji(t.TrimStart('#').Replace("**", "")).Trim();
+                string lo = h.ToLowerInvariant();
+                skip = lo.StartsWith("how to get") || lo.StartsWith("how to update") || lo.StartsWith("how to download") || lo.StartsWith("how to install")
+                    || lo == "download" || lo == "downloads" || lo == "install";
+                if (!skip && h.Length > 0) { Block hb = new Block { Kind = 2 }; hb.Runs.Add(new Run { Text = h, Bold = true }); c.Add(hb); }
+                continue;
+            }
+            if (skip || t.Length == 0 || t.StartsWith("|") || t.StartsWith("---") || t.StartsWith("<") || t.StartsWith("```") || t.StartsWith(">")) continue;
+            bool bullet = t.StartsWith("- ") || t.StartsWith("* ");
+            List<Run> r = Runs(bullet ? t.Substring(2) : t);
+            if (r.Count > 0) c.Add(new Block { Kind = bullet ? 1 : 0, Runs = r });
+        }
+        if (c.Count > (version != null ? 1 : 0)) cards.Add(c);
+    }
+    public bool Empty { get { return cards.Count == 0; } }
+
+    // Lays everything out at this width; draws it too when g isn't null. Returns the height needed.
+    public int Flow(Graphics g, int width)
+    {
+        float K = Card.K;
+        int pad = (int)(18 * K), y = 0;
+        Font body = Theme.Body ?? Font, bold = Theme.Strong ?? body, head = Theme.Title ?? bold, ver = Theme.CardTitle ?? head;
+        TextFormatFlags tf = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
+        int space = TextRenderer.MeasureText("a a", body, Size.Empty, tf).Width - TextRenderer.MeasureText("aa", body, Size.Empty, tf).Width;
+        foreach (List<Block> c in cards)
+        {
+            int top = y, cy = top + pad;
+            List<Action<Graphics>> draws = new List<Action<Graphics>>();
+            for (int bi = 0; bi < c.Count; bi++)
+            {
+                Block b = c[bi];
+                if (bi > 0) cy += b.Kind == 2 || b.Kind == 3 ? (int)(14 * K) : (int)(6 * K);
+                int indent = b.Kind == 1 ? (int)(18 * K) : 0, x0 = pad + indent, maxX = width - pad;
+                Font nf = b.Kind == 3 ? ver : b.Kind == 2 ? head : body, bf = b.Kind >= 2 ? nf : bold;
+                Color col = b.Kind == 2 || b.Kind == 3 ? Theme.Accent : Theme.Text;
+                int lh = TextRenderer.MeasureText("Ag", nf, Size.Empty, tf).Height + (int)(2 * K);
+                if (b.Kind == 1)
+                {
+                    float d = 6 * K; RectangleF dot = new RectangleF(pad + 4 * K, cy + (lh - d) / 2f, d, d);
+                    draws.Add(gg => { using (SolidBrush br = new SolidBrush(Theme.Accent)) gg.FillEllipse(br, dot); });
+                }
+                // words wrap at the edge; each line is drawn in pieces of one font (measured whole, so the spaces
+                // are the font's own)
+                int line = cy, sx = x0;           // where the piece being built starts
+                string piece = ""; Font pf = nf;
+                bool gapNext = false;             // a space before the next word
+                Action flush = delegate
+                {
+                    if (piece.Length == 0) return;
+                    Point at = new Point(sx, line); Font ff = pf; string text = piece;
+                    draws.Add(gg => TextRenderer.DrawText(gg, text, ff, at, col, tf));
+                    sx += TextRenderer.MeasureText(piece + "x", pf, Size.Empty, tf).Width - TextRenderer.MeasureText("x", pf, Size.Empty, tf).Width; piece = "";   // without the measuring's own margin
+                };
+                foreach (Run r in b.Runs)
+                {
+                    Font f = r.Bold ? bf : nf;
+                    string[] words = r.Text.Split(' ');
+                    for (int wi = 0; wi < words.Length; wi++)
+                    {
+                        string w = words[wi];
+                        if (w.Length == 0) { gapNext = true; continue; }
+                        bool lineEmpty = piece.Length == 0 && sx == x0;
+                        if (f != pf && piece.Length > 0) flush();
+                        if (piece.Length == 0) { pf = f; if (gapNext && !lineEmpty) sx += space; }
+                        string cand = piece.Length > 0 && gapNext ? piece + " " + w : piece + w;
+                        if (!lineEmpty && sx + TextRenderer.MeasureText(cand, f, Size.Empty, tf).Width > maxX)
+                        {
+                            flush(); line += lh; sx = x0; cand = w; pf = f;
+                        }
+                        piece = cand; gapNext = wi < words.Length - 1;
+                    }
+                }
+                flush();
+                cy = line + lh;
+            }
+            int bottom = cy + pad;
+            if (g != null)
+            {
+                Theme.FillRound(g, Theme.Card, Theme.Stroke, new RectangleF(0.5f, top + 0.5f, width - 1.5f, bottom - top - 1.5f), 14 * K, 1);
+                foreach (Action<Graphics> a in draws) a(g);
+            }
+            y = bottom + (int)(12 * K);
+        }
+        return Math.Max(0, y - (int)(12 * K));
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.Clear(Theme.Window);
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        Flow(e.Graphics, Width);
+    }
 }
 
 // A small rounded label: a coloured dot and the text (ForeColor), like "Up to date".
@@ -635,9 +827,13 @@ class Ring : Control
 }
 
 // Seven bars (one per day), drawn with the accent gradient.
+// This week's new versions, a bar a day from Sunday to Saturday, each with its day under it (today's in the accent;
+// the days still to come are faint).
 class Bars : Control
 {
     public int[] Values = new int[7];
+    public int Today = -1;   // 0 = Sunday ... 6 = Saturday
+    static readonly string[] Names = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
     public Bars() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true); }
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -645,14 +841,23 @@ class Bars : Control
         Theme.ParentBack(g, this);
         g.SmoothingMode = SmoothingMode.AntiAlias;
         int n = Values.Length, max = Math.Max(1, Values.Max());
+        Font f = Theme.Small ?? Font;
+        int lh = TextRenderer.MeasureText("Sun", f).Height, bh = Math.Max(8, Height - lh - (int)(2 * Card.K));
         float gap = 6 * Card.K, bw = (Width - gap * (n - 1)) / n;
         for (int i = 0; i < n; i++)
         {
-            float h = Math.Max(4, (Height - 2) * Values[i] / (float)max), x = i * (bw + gap);
-            RectangleF r = new RectangleF(x, Height - h, bw, h);
-            using (LinearGradientBrush b = new LinearGradientBrush(new RectangleF(x, 0, bw, Height + 1), Theme.Accent, Theme.Blend(Theme.Card, Theme.Accent2, 0.35), 90f))
-            using (GraphicsPath p = Theme.Round(r, Math.Min(4 * Card.K, bw / 2)))
-                g.FillPath(b, p);
+            bool later = Today >= 0 && i > Today;
+            float h = Math.Max(4, (bh - 2) * Values[i] / (float)max), x = i * (bw + gap);
+            RectangleF r = new RectangleF(x, bh - h, bw, h);
+            if (later) Theme.FillRound(g, Theme.Blend(Theme.Card, Theme.Accent2, 0.15), Color.Empty, r, Math.Min(4 * Card.K, bw / 2), 0);
+            else
+                using (LinearGradientBrush b = new LinearGradientBrush(new RectangleF(x, 0, bw, bh + 1), Theme.Accent, Theme.Blend(Theme.Card, Theme.Accent2, 0.35), 90f))
+                using (GraphicsPath p = Theme.Round(r, Math.Min(4 * Card.K, bw / 2)))
+                    g.FillPath(b, p);
+            if (n == 7)
+                TextRenderer.DrawText(g, Names[i], f, new Rectangle((int)x - 4, Height - lh, (int)bw + 8, lh),
+                                      i == Today ? Theme.Accent : later ? Theme.Disabled : Theme.Muted,
+                                      TextFormatFlags.HorizontalCenter | TextFormatFlags.Bottom | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
         }
     }
 }
@@ -870,6 +1075,9 @@ class EmuForm : Form
     readonly LinkLabel checkLink = new LinkLabel(), logLink = new LinkLabel();
     readonly TextBox logBox = new TextBox();
     Form logForm;
+    int closedAsking;   // an "X closed" question is open
+    readonly Button logHelp = new Button();   // "Copy for help": what someone helping on Discord needs, ready to paste
+    readonly Label logHint = new Label();
     readonly List<EmuCard> cards = new List<EmuCard>();
     readonly ToolTip tips = new ToolTip();
     static readonly Dictionary<Control, Color> accents = new Dictionary<Control, Color>();
@@ -882,8 +1090,8 @@ class EmuForm : Form
     bool IsBusy { get { return anyBusy || identifying > 0 || asking > 0; } }
     void PleaseWait() { Tell(APP, "Please wait for the current task to finish."); }
     readonly Card gamesCard = new Card();
-    readonly Label gamesLbl = new Label(), gamesCap = new Label();
-    readonly Button gamesPick = new Button();
+    readonly Label gamesLbl = new Label(), gamesCap = new Label(), games1Lbl = new Label();
+    readonly Button gamesPick = new Button(), games1Pick = new Button();
     // the small tiles under the emulators: saves, storage, updates, manager (the games folder tile is gamesCard)
     readonly Card savesTile = new Card(), storeTile = new Card(), updTile = new Card(), mgrTile = new Card();
     readonly Label savesCap = new Label(), savesBig = new Label(), savesUnit = new Label(), savesLine = new Label();
@@ -895,6 +1103,7 @@ class EmuForm : Form
     readonly Bars updBars = new Bars();
     readonly Label mgrCap = new Label(), mgrText = new Label();
     readonly StatusChip mgrChip = new StatusChip();
+    readonly Button mgrGo = new Button();   // "Update" on the manager tile when a newer manager is out
     static readonly Dictionary<Control, string> fontRoles = new Dictionary<Control, string>();   // caption / big / value / name / small / large / strong
     static readonly HashSet<Control> toggles = new HashSet<Control>();   // check boxes drawn as on/off switches
     DateTime checkedAt = DateTime.MinValue;   // last update check that finished
@@ -909,42 +1118,73 @@ class EmuForm : Form
     [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Point p);
     const string APP = "NS2 Emulator Manager";
 
+    // The Switch 1 games folder is shown once there's a Switch 1 emulator on the list (or it's been set).
+    static bool ShowSwitch1Games() { return Core.Cfg.Emulators.Any(e => Core.SwitchOf(e) == 1) || !string.IsNullOrEmpty(Core.Cfg.Games1Folder); }
+
+    bool games1Shown;   // the tile has the Switch 1 row (its height follows this, not the label's Visible)
     void GamesText()
     {
-        string g = Core.Cfg.GamesFolder;
+        bool two = ShowSwitch1Games();
+        games1Shown = two;
+        gamesCap.Text = two ? "Games folders" : "Games folder";
+        GamesRow(gamesLbl, gamesPick, Core.Cfg.GamesFolder, two ? "Switch 2:  " : "", two ? "Choose the folder with your Switch 2 games." : "Choose the folder with your games.");
+        games1Lbl.Visible = games1Pick.Visible = two;
+        if (two) GamesRow(games1Lbl, games1Pick, Core.Cfg.Games1Folder, "Switch 1:  ", "Choose the folder with your Switch 1 games.");
+    }
+    void GamesRow(Label l, Button b, string g, string label, string empty)
+    {
         bool set = !string.IsNullOrEmpty(g);
-        gamesLbl.Text = !set ? "Choose the folder with your games." : g + (Directory.Exists(g) ? "" : "   (not found)");
-        roles[gamesLbl] = set && Directory.Exists(g) ? "text" : "info";
-        gamesLbl.ForeColor = RoleColor(gamesLbl);
-        gamesPick.Text = set ? "Change..." : "Choose...";
-        if (set) accents.Remove(gamesPick); else Outline(gamesPick, Theme.Accent);
-        gamesPick.Invalidate();
+        l.Text = !set ? empty : label + g + (Directory.Exists(g) ? "" : "   (not found)");
+        roles[l] = set && Directory.Exists(g) ? "text" : "info";
+        l.ForeColor = RoleColor(l);
+        b.Text = set ? "Change..." : "Choose...";
+        if (set) accents.Remove(b); else Outline(b, Theme.Accent);
+        b.Invalidate();
     }
 
-    void PickGames()
+    // sw: 2 = the Switch 2 games folder, 1 = the Switch 1 one
+    void PickGames(int sw)
     {
-        string picked = FolderPicker.Pick(this, "Choose the folder with your games",
-                                          !string.IsNullOrEmpty(Core.Cfg.GamesFolder) && Directory.Exists(Core.Cfg.GamesFolder) ? Core.Cfg.GamesFolder : null);
+        string cur = Core.GamesFolderOf(sw);
+        string picked = FolderPicker.Pick(this, sw == 1 ? "Choose the folder with your Switch 1 games" : ShowSwitch1Games() ? "Choose the folder with your Switch 2 games" : "Choose the folder with your games",
+                                          !string.IsNullOrEmpty(cur) && Directory.Exists(cur) ? cur : null);
         if (picked == null) return;
-        string prev = Core.Cfg.GamesFolder;
-        Core.Cfg.GamesFolder = picked;
+        if (sw == 1) Core.Cfg.Games1Folder = picked; else Core.Cfg.GamesFolder = picked;
         try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save the games folder: " + ex.Message); }
         GamesText();
-        Log("Games folder set to " + picked);
-        SyncGames(prev, true);
+        Log((sw == 1 ? "Switch 1 games folder" : ShowSwitch1Games() ? "Switch 2 games folder" : "Games folder") + " set to " + picked);
+        SyncGames(cur, sw, true);
     }
 
-    // Writes the games folder into each installed build's game list (or just one, before it launches).
-    void SyncGames(string previous, bool all, EmuDef only = null)
+    // Writes each installed build's games folder into its game list (or just one, before it launches).
+    void SyncGames(string previous, int previousFor, bool all, EmuDef only = null)
     {
         int n = 0;
         foreach (EmuCard c in cards)
         {
             if (only != null && c.Def != only) continue;
-            try { string m = Core.SyncGamesFolder(c.Def, previous); if (m != null) { Log(m); n++; } }
+            try { string m = Core.SyncGamesFolder(c.Def, previous, previousFor); if (m != null) { Log(m); n++; } }
             catch (Exception ex) { Log(c.Def.Name + ": could not set the game folder: " + ex.Message); }
         }
-        if (all && n == 0) Log("Every installed build already lists " + Core.Cfg.GamesFolder + ".");
+        if (all && n == 0) Log("Every installed build already lists its games folder.");
+    }
+
+    // The card's "Switch 1 or Switch 2..." : which games it plays, so it lists the right games folder.
+    void ChooseSwitch(EmuCard c)
+    {
+        int cur = Core.SwitchOf(c.Def);
+        int r = Ask("Switch 1 or Switch 2?", c.Def.Name + " is set as a Switch " + cur + " emulator, so it lists your Switch " + cur + " games folder.\r\n\r\nWhich games does it play?",
+                    cur == 1 ? "Switch 1 games" : "Switch 2 games", cur == 1 ? "Switch 2 games" : "Switch 1 games", "Cancel");   // its current choice first
+        if (r != 0 && r != 1) return;
+        int sw = r == 0 ? cur : 3 - cur;
+        if (sw == cur && c.Def.SwitchVersion == sw) return;
+        c.Def.SwitchVersion = sw;
+        try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save: " + ex.Message); }
+        Log(c.Def.Name + " is now a Switch " + sw + " emulator.");
+        GamesText(); DoLayout();
+        SyncGames(null, 0, false, c.Def);
+        if (sw == 1 && string.IsNullOrEmpty(Core.Cfg.Games1Folder))
+            SetFooter("Choose your Switch 1 games folder in the Games folders tile.", Theme.Info);
     }
 
     // Release notes as plain text: markdown links -> their text, no tables, headings or code ticks, and the sections
@@ -1140,8 +1380,11 @@ class EmuForm : Form
         string block = UserData.LaunchProblem(c.Def);
         if (block != null) { Tell("Can't launch yet", block); return; }
         if (!WarnOtherEmulators(c)) return;
+        try { string gm = Core.SyncGamesFolder(c.Def, null, 0, false); if (gm != null) Log(gm); }   // a Switch 1 emulator: not the Switch 2 games (only takes out; only writes on a change)
+        catch (Exception ex) { Log(c.Def.Name + ": could not check its game list: " + ex.Message); }
         try
         {
+            DateTime started = DateTime.Now;
             Process p = Core.Launch(c.Def);
             Log("Launched " + Path.Combine(c.Def.Dir, c.Def.Exe));
             if (p != null)
@@ -1155,8 +1398,24 @@ class EmuForm : Form
                         // Eden-based emulators can restart themselves (the first process ends, a new window opens): fine
                         if (Core.Running(c.Def).Count > 0) { Log(c.Def.Name + " is running again (it restarted itself)."); return; }
                         bool others = cards.Any(k => k != c && Installed(k.Def) && Core.Running(k.Def).Count > 0);
-                        if (code == 0 && !others) return;   // closed normally: most likely the user closed it
-                        Fail(c, others ? c.Def.Name + " closed right away. Close other emulators and try again." : c.Def.Name + " closed right away. Try again.");
+                        int kind; List<string> errs;
+                        string why = EarlyClose(c.Def, code, started, others, out kind, out errs);
+                        foreach (string e in errs) Log("  " + c.Def.Name + "'s log: " + e);
+                        if (why == null) return;   // closed normally, nothing wrong in its log: most likely the user closed it
+                        int cut = why.IndexOf(": "), dot = why.IndexOf(". ");   // the card: the first sentence; the window: all of it
+                        Fail(c, cut > 0 ? why.Substring(0, cut) + "." : dot > 0 ? why.Substring(0, dot + 1) : why, why);
+                        // the card says it already: no question over another window (or another of these)
+                        if (IsBusy || closedAsking > 0 || OwnedForms.Any(o => o.Visible && o != logForm) || (Form.ActiveForm != null && Form.ActiveForm != this)) return;
+                        string[] buttons = kind == 1 ? new[] { "Set up keys and firmware", "Show log", "OK" }
+                                         : kind == 3 ? new[] { "Open Microsoft's page", "OK" }
+                                         : new[] { "Show log", "OK" };
+                        int a;
+                        closedAsking++;
+                        try { a = Ask(c.Def.Name + " closed", why, buttons); } finally { closedAsking--; }
+                        if (a < 0 || buttons[a] == "OK") return;
+                        if (buttons[a] == "Show log") ShowLog();
+                        else if (kind == 1) SetupHelp(c);
+                        else if (kind == 3) try { Process.Start("https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist"); } catch { }
                     });
                 });
         }
@@ -1256,8 +1515,11 @@ class EmuForm : Form
         gamesCap.Text = "Games folder"; storeCap.Text = "Storage"; updCap.Text = "Updates"; mgrCap.Text = "Manager";
         foreach (Label l in new[] { gamesCap, savesCap, storeCap, updCap, mgrCap }) { fontRoles[l] = "caption"; roles[l] = "muted"; l.AutoEllipsis = true; }
         gamesLbl.AutoEllipsis = true; fontRoles[gamesLbl] = "large";
-        gamesPick.Click += delegate { PickGames(); };
-        gamesCard.Controls.AddRange(new Control[] { gamesCap, gamesLbl, gamesPick });
+        games1Lbl.AutoEllipsis = true; fontRoles[games1Lbl] = "large";
+        gamesLbl.UseMnemonic = games1Lbl.UseMnemonic = false;
+        gamesPick.Click += delegate { PickGames(2); };
+        games1Pick.Click += delegate { PickGames(1); };
+        gamesCard.Controls.AddRange(new Control[] { gamesCap, gamesLbl, gamesPick, games1Lbl, games1Pick });
         savesLink.Text = "Save Helper ›"; savesLink.LinkClicked += delegate { SaveHelper(); }; savesLink.TextAlign = ContentAlignment.MiddleRight;
         fontRoles[savesBig] = "big"; fontRoles[savesUnit] = "value"; roles[savesUnit] = "muted"; roles[savesLine] = "muted"; savesLine.AutoEllipsis = true;
         savesTile.Controls.AddRange(new Control[] { savesCap, savesLink, savesBig, savesUnit, savesLine, savesWho });
@@ -1266,7 +1528,8 @@ class EmuForm : Form
         updTile.Controls.AddRange(new Control[] { updCap, updText, updWhen, updBars, updLine });
         fontRoles[mgrText] = "value"; mgrText.AutoEllipsis = true; fontRoles[mgrChip] = "small";
         mgrChip.Click += delegate { if (mgrRel != null) UpdateManager(); };
-        mgrTile.Controls.AddRange(new Control[] { mgrCap, mgrText, mgrChip });
+        mgrGo.Text = "Update"; mgrGo.Visible = false; mgrGo.Click += delegate { UpdateManager(); };
+        mgrTile.Controls.AddRange(new Control[] { mgrCap, mgrText, mgrChip, mgrGo });
         cardsHost.Controls.AddRange(new Control[] { savesTile, storeTile, updTile, gamesCard, mgrTile });
         clock.Interval = 30000; clock.Tick += delegate { if (WindowState != FormWindowState.Minimized) InfoText(); };
         clock.Start();
@@ -1325,7 +1588,12 @@ class EmuForm : Form
         // first start: the welcome list (nothing is on the list yet); afterwards the usual update check
         Shown += delegate
         {
+            Version before = null;
+            try { before = Demo == null && !Core.Cfg.Sandbox ? PreviousVersion() : null; } catch { }
             Log("--- NS2 Emulator Manager " + Core.AppVersion + " started (" + Application.ExecutablePath + ")");
+            if (before != null) WhatsNew(before);
+            else if (Demo == null && !Core.Cfg.Sandbox)   // a new install (or an unreadable file): this version is the one to compare with next time
+                try { File.WriteAllText(LastVersionFile, Core.AppVersion.ToString(3)); } catch { }
             if (Demo == null) OnScreen();
             FitHeight();
             ScanInfo();   // Activated usually started it already
@@ -1379,21 +1647,126 @@ class EmuForm : Form
 
     // --demo NAME[:ID] (test environment only): opens one screen right away, for screenshots.
     public static string Demo;
+    // ---- "What's new" once after the manager was updated
+    // DataDir\last-version.txt holds the version that last ran (and saw its notes). Without it (1.3.12 and older never
+    // wrote it), the last start line in the log says which version ran before. Null: nothing to show (a new install).
+    static string LastVersionFile { get { return Path.Combine(Core.DataDir, "last-version.txt"); } }
+    static readonly System.Text.RegularExpressions.Regex StartLine = new System.Text.RegularExpressions.Regex(@"--- NS2 Emulator Manager (\d+\.\d+(?:\.\d+)?) started");
+    static Version PreviousVersion()
+    {
+        Version v;
+        if (File.Exists(LastVersionFile)) return Version.TryParse(File.ReadAllText(LastVersionFile).Trim(), out v) ? v : null;
+        foreach (string f in new[] { LogPath, Path.Combine(Core.DataDir, "manager.old.log") })
+        {
+            if (!File.Exists(f)) continue;
+            System.Text.RegularExpressions.MatchCollection m = StartLine.Matches(File.ReadAllText(f));
+            if (m.Count == 0) continue;
+            if (!Version.TryParse(m[m.Count - 1].Groups[1].Value, out v)) return null;
+            // from now on the file says it, so an update started with no internet still shows its notes next time
+            try { File.WriteAllText(LastVersionFile, v.ToString()); } catch { }
+            return v;
+        }
+        return null;
+    }
+
+    // An older version ran last: show the notes of every manager release since, newest first. Asked in the background;
+    // without an answer (no internet) the file stays as it is, so it's tried again next start.
+    void WhatsNew(Version before)
+    {
+        Version now = new Version(Core.AppVersion.Major, Core.AppVersion.Minor, Math.Max(0, Core.AppVersion.Build));
+        bool demo = Demo != null;
+        Action seen = delegate { if (!demo) try { File.WriteAllText(LastVersionFile, now.ToString()); } catch { } };
+        if (before >= now) { if (before != now) seen(); return; }
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            List<KeyValuePair<Version, Release>> notes = null; string err = null;
+            try { notes = Core.ManagerNotes(before, now); } catch (Exception ex) { err = ex.Message; }
+            UI(delegate
+            {
+                if (err != null) { FileLog("Couldn't get the manager's release notes: " + err); return; }
+                if (demo ? notes.Count == 0 : !notes.Any(k => k.Key == now)) { FileLog("The notes for " + now + " aren't on GitHub (yet): what's new is shown on a later start."); return; }
+                Action show = null;
+                show = delegate
+                {
+                    if (IsDisposed) return;
+                    // after any other window (Welcome, a question) has closed
+                    if (!Enabled || Application.OpenForms.Cast<Form>().Any(f => f != this && f.Visible && f.Modal) || WindowState == FormWindowState.Minimized)
+                    {
+                        System.Windows.Forms.Timer t = new System.Windows.Forms.Timer(); t.Interval = 1500;
+                        t.Tick += delegate { t.Stop(); t.Dispose(); show(); }; t.Start(); return;
+                    }
+                    seen();
+                    Log("Showing what's new since " + before + ".");
+                    WhatsNewWindow(before, now, notes);
+                };
+                show();
+            });
+        });
+    }
+
+    void WhatsNewWindow(Version before, Version now, List<KeyValuePair<Version, Release>> notes)
+    {
+        NotesView nv = new NotesView();
+        foreach (KeyValuePair<Version, Release> k in notes) nv.Add(notes.Count > 1 ? k.Key.ToString() : null, k.Value.Body);
+        if (nv.Empty) { nv.Dispose(); return; }
+        QuietForm f = new QuietForm();
+        f.Text = "What's new"; f.FormBorderStyle = FormBorderStyle.FixedDialog; f.MinimizeBox = f.MaximizeBox = false; f.ShowInTaskbar = false;
+        f.StartPosition = FormStartPosition.CenterParent; f.Font = Font; f.BackColor = Theme.Window; f.ForeColor = Theme.Text;
+        int W = D(620), pad = D(22);
+        Label t = new Label(); t.Text = "The manager was updated to " + now; t.Font = Theme.Name ?? Theme.Header; t.ForeColor = Theme.Text; t.AutoEllipsis = true;
+        t.SetBounds(pad, D(18), W - 2 * pad, D(34));
+        Label s = new Label(); s.ForeColor = Theme.Muted; s.AutoEllipsis = true; s.SetBounds(pad, D(54), W - 2 * pad, D(22));
+        s.Text = notes.Count > 1 ? "Here's what changed since " + before + "." : "Here's what changed.";
+        Panel box = new Panel(); box.AutoScroll = true; box.BackColor = Theme.Window;
+        int maxBox = D(430), full = W - 2 * pad, inner = full - SystemInformation.VerticalScrollBarWidth - D(4);
+        int need = nv.Flow(null, full), bw = full;
+        if (need > maxBox) { bw = inner; need = nv.Flow(null, inner); }
+        int bh = Math.Min(need, maxBox);
+        box.SetBounds(pad, D(88), full, bh);
+        nv.SetBounds(0, 0, bw, need);
+        box.Controls.Add(nv);
+        Button ok = new Button(); ok.Text = "Got it"; ok.SetBounds(W - pad - D(120), D(88) + bh + D(18), D(120), D(36)); ok.Click += delegate { f.Close(); };
+        f.Controls.AddRange(new Control[] { t, s, box, ok });
+        StyleButton(ok); ok.BackColor = Theme.Window; Outline(ok, Theme.Accent);
+        f.AcceptButton = ok; f.CancelButton = ok;
+        f.ClientSize = new Size(W, ok.Bottom + D(18));
+        f.HandleCreated += delegate { Native.Apply(f.Handle, Theme.Dark, 0); Native.ControlTheme(box.Handle, Theme.Dark ? "DarkMode_Explorer" : "Explorer"); };
+        f.Shown += delegate { ok.Focus(); };
+        if (Demo != null)
+        {   // screenshots: left open, over the window
+            f.StartPosition = FormStartPosition.Manual; f.Location = new Point(Left + (Width - f.Width) / 2, Top + (Height - f.Height) / 2);
+            f.FormClosed += delegate { f.Dispose(); };
+            f.Show(this); return;
+        }
+        f.ShowDialog(this); f.Dispose();
+    }
+
     void RunDemo()
     {
         EmuCard c = cards.FirstOrDefault(k => Demo.EndsWith(":" + k.Def.Id)) ?? cards.FirstOrDefault();
         string n = Demo.Split(':')[0];
         if (n == "welcome") ShowRecommended(true);
+        else if (n == "whatsnew") { string[] wp = Demo.Split(':'); Version b; if (wp.Length > 1 && Version.TryParse(wp[1], out b)) WhatsNew(b); }   // whatsnew:1.3.7
         else if (n == "add") ShowRecommended(false);
         else if (n == "link") AddFork();
         else if (n == "shared") SharedDialog();
         else if (n == "menu") MainMenu().Show(menuBtn, new Point(0, menuBtn.Height));
         else if (n == "cardmenu" && c != null) CardMenu(c).Show(c.More, new Point(0, c.More.Height));
+        else if (n == "cardfolders" && c != null)   // the card menu with "Open folder" open
+        {
+            ContextMenuStrip m = CardMenu(c); m.Show(c.More, new Point(0, c.More.Height));
+            ToolStripMenuItem f = m.Items.OfType<ToolStripMenuItem>().FirstOrDefault(x => x.Text == "Open folder");
+            if (f != null) f.ShowDropDown();
+        }
         else if (n == "setup" && c != null) SetupHelp(c);
         else if (n == "portable" && c != null) MakePortable(c);
         else if (n == "remove" && c != null) RemoveFork(c);
+        else if (n == "rename" && c != null) RenameEmu(c);
+        else if (n == "switch" && c != null) ChooseSwitch(c);
         else if (n == "update" && c != null) CheckOne(c, delegate { if (c.Rel != null) DoUpdate(c); });
         else if (n == "log") ShowLog();
+        else if (n == "launch" && c != null) LaunchNow(c);   // the check after a launch (a test emulator that closes)
+        else if (n == "loghelp") { ShowLog(); File.WriteAllText(Path.Combine(Core.Home, "help.txt"), HelpText()); }   // what Copy for help copies
         else if (n == "main") { }   // just the main window
         else if ((n == "versions" || n == "versionsopen") && c != null) ChooseVersion(c);
         else if (n == "share" && c != null) ToggleShare(c);
@@ -1604,6 +1977,192 @@ class EmuForm : Form
         Label pad = new Label(); pad.SetBounds(x, y, 1, 1); host.Controls.Add(pad);   // room at the bottom when scrolling
     }
 
+    // ---- why an emulator closed within seconds of starting, in plain words (from its exit code and its own log)
+    // Null when it looks like a normal close (exit code 0, no errors in its log, nothing else open): most likely the
+    // user closed it. kind: 0 anything else, 1 keys or firmware missing, 2 graphics driver, 3 a Windows part missing.
+    // errs: the error lines its log wrote during this start (for the manager's log).
+    static string EarlyClose(EmuDef d, int code, DateTime started, bool others, out int kind, out List<string> errs)
+    {
+        kind = 0;
+        List<string> tail = EmuLogTail(d, started, 60);
+        errs = tail.Where(l => l.Contains("<Critical>") || l.Contains("<Error>")).Select(l => l.Trim()).ToList();
+        if (errs.Count > 8) errs = errs.Skip(errs.Count - 8).ToList();
+        uint uc = unchecked((uint)code);
+        string name = d.Name, hex = "0x" + uc.ToString("X8");
+        List<string> crit = errs.Where(l => l.Contains("<Critical>")).ToList();
+        // exit code 0: it closed normally (most likely the user closed it), unless its log says something critical
+        // went wrong; ordinary <Error> lines are common and harmless then
+        if (code == 0 && crit.Count == 0) return null;
+        // only the messages ("Class <Level> file:line:Func: message"), not the class or file names ("Render_Vulkan")
+        string low = string.Join("\n", (code == 0 ? crit : errs).Select(Message)).ToLowerInvariant();
+        Func<string[], bool> says = words => words.Any(w => low.Contains(w));
+        if (uc == 0xC0000135 || uc == 0xC0000139 || uc == 0xC000007B)
+        {
+            kind = 3;
+            return name + " couldn't start because a part of Windows it needs is missing (" + hex + "). Install the latest "
+                 + "\"Microsoft Visual C++ Redistributable\" (X64) from Microsoft's page, restart your PC, then try again.";
+        }
+        if (!HasKeys(d) || says(new[] { "prod.keys", "title.keys", "missing keys", "key area key", "keys are missing" }))
+        {
+            kind = 1;
+            return name + " closed right away. It doesn't have its keys yet: it needs the keys from your own Switch.";
+        }
+        if (!HasFirmware(d) || says(new[] { "firmware is not installed", "firmware not found", "missing firmware" }))
+        {
+            kind = 1;
+            return name + " closed right away. It doesn't have its firmware yet: it needs the firmware from your own Switch.";
+        }
+        if (says(new[] { "vk_error", "failed to create vulkan", "vkcreateinstance", "vkcreatedevice", "failed to initialize vulkan",
+                         "vulkan is not supported", "vulkan not supported", "vulkan-1.dll", "no suitable gpu", "gpu not supported", "graphics driver" }))
+        {
+            kind = 2;
+            return name + " closed because it couldn't use your graphics card. Update your graphics driver (from the NVIDIA, "
+                 + "AMD or Intel website), restart your PC, then try again.";
+        }
+        if (others) return name + " closed right away. Close the other emulators and try again.";
+        if (uc == 0xC0000017 || says(new[] { "bad_alloc", "out of memory" }))
+            return name + " ran out of memory. Close other programs and try again.";
+        return name + " closed right away" + (code != 0 ? " (error " + hex + ")" : "") + ". Try again. If it keeps happening, "
+             + "click Show log, then Copy for help, and paste it on Discord.";
+    }
+
+    // The message part of an emulator log line: "[ 0.4] Render_Vulkan <Critical> vulkan_device.cpp:12:Create: Failed..."
+    // -> "Failed...".
+    static string Message(string line)
+    {
+        int lv = line.IndexOf("<Critical>"); if (lv < 0) lv = line.IndexOf("<Error>");
+        if (lv < 0) return line;
+        int m = line.IndexOf(": ", lv);
+        return m < 0 ? line.Substring(lv) : line.Substring(m + 2);
+    }
+
+    // The last lines of an emulator's own log (user\log, Eden-based emulators: eden_log.txt), only if it was written
+    // since "since" (DateTime.MinValue: any). Read without locking it: the emulator may still be writing.
+    static List<string> EmuLogTail(EmuDef d, DateTime since, int lines)
+    {
+        try
+        {
+            string dir = Path.Combine(d.Dir, "user", "log");
+            if (!Directory.Exists(dir)) return new List<string>();
+            FileInfo f = new DirectoryInfo(dir).GetFiles().Where(x => !x.Name.Contains(".old")).OrderByDescending(x => x.LastWriteTime).FirstOrDefault();
+            if (f == null || f.LastWriteTime < since.AddSeconds(-2)) return new List<string>();
+            string text;
+            using (FileStream fs = new FileStream(f.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            {
+                if (fs.Length > 256 * 1024) fs.Seek(-256 * 1024, SeekOrigin.End);
+                using (StreamReader r = new StreamReader(fs)) text = r.ReadToEnd();
+            }
+            List<string> all = text.Replace("\r", "").Split('\n').Where(l => l.Trim().Length > 0).ToList();
+            return all.Skip(Math.Max(0, all.Count - lines)).ToList();
+        }
+        catch { return new List<string>(); }
+    }
+
+    // ---- "Copy for help": the manager, Windows, the PC and each emulator in a few lines, then the end of the log.
+    // The Windows user folder is replaced by %USERPROFILE% (the user name stays private when it's pasted on Discord).
+    string HelpText()
+    {
+        System.Text.StringBuilder b = new System.Text.StringBuilder();
+        Action<string> L = s => b.Append(s).Append("\r\n");
+        L("NS2 Emulator Manager " + Core.AppVersion.ToString(3) + (Core.Portable ? " (portable)" : " (installed)"));
+        L("Windows: " + WindowsName());
+        L("Processor: " + (Reg(@"HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\CentralProcessor\0", "ProcessorNameString") ?? "?").Trim());
+        try { L("Memory: " + Math.Round(new Microsoft.VisualBasic.Devices.ComputerInfo().TotalPhysicalMemory / 1073741824.0) + " GB"); } catch { }
+        foreach (string g in GraphicsCards()) L("Graphics: " + g);
+        try { DriveInfo di = new DriveInfo(Path.GetPathRoot(Core.Home)); L("Drive " + di.Name.TrimEnd('\\') + " " + di.DriveFormat + ", " + di.AvailableFreeSpace / 1073741824 + " GB free"); } catch { }
+        L("");
+        L("Emulators:");
+        foreach (EmuCard c in cards)
+        {
+            EmuDef d = c.Def;
+            Manifest m = null; try { m = Core.LoadManifest(d.Dir); } catch { }
+            bool inst = Installed(d);
+            L("- " + d.Name + " (Switch " + Core.SwitchOf(d) + ", " + (d.Repo ?? "?") + "): "
+              + (inst ? "version " + (m != null ? m.Tag : "?") + ", keys " + (HasKeys(d) ? "yes" : "no") + ", firmware " + (HasFirmware(d) ? "yes" : "no")
+                      + (c.Joined ? ", shares data" : "") + (Core.Running(d).Count > 0 ? ", open now" : "") : "not installed")
+              + (c.Err != null ? "\r\n    Problem: " + c.Err : ""));
+        }
+        foreach (EmuCard c in cards.Where(k => k.Err != null && Installed(k.Def)))
+        {
+            List<string> t = EmuLogTail(c.Def, DateTime.MinValue, 25);
+            if (t.Count == 0) continue;
+            L("");
+            L("End of " + c.Def.Name + "'s own log:");
+            foreach (string l in t) L(l);
+        }
+        L("");
+        L("End of the manager's log:");
+        try
+        {
+            string text;
+            using (FileStream fs = new FileStream(LogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (StreamReader r = new StreamReader(fs)) text = r.ReadToEnd();
+            List<string> all = text.Replace("\r", "").Split('\n').Where(l => l.Length > 0).ToList();
+            foreach (string l in all.Skip(Math.Max(0, all.Count - 60))) L(l);
+        }
+        catch { L("(couldn't read it)"); }
+        string s2 = b.ToString();
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrEmpty(home))
+        {
+            s2 = System.Text.RegularExpressions.Regex.Replace(s2, System.Text.RegularExpressions.Regex.Escape(home), "%USERPROFILE%", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            s2 = System.Text.RegularExpressions.Regex.Replace(s2, System.Text.RegularExpressions.Regex.Escape(home.Replace('\\', '/')), "%USERPROFILE%", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+        return s2;
+    }
+    static string Reg(string key, string name) { try { object v = Microsoft.Win32.Registry.GetValue(key, name, null); return v == null ? null : v.ToString(); } catch { return null; } }
+    static string WindowsName()
+    {
+        const string k = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion";
+        string build = Reg(k, "CurrentBuildNumber") ?? Reg(k, "CurrentBuild") ?? "?", ubr = Reg(k, "UBR"), ed = Reg(k, "EditionID") ?? "", ver = Reg(k, "DisplayVersion") ?? Reg(k, "ReleaseId") ?? "";
+        int bn; int.TryParse(build, out bn);
+        ed = ed == "Core" || ed == "CoreSingleLanguage" || ed == "CoreCountrySpecific" ? "Home" : ed == "Professional" ? "Pro" : ed;   // the names Windows shows
+        return (bn >= 22000 ? "Windows 11" : "Windows 10") + (ed.Length > 0 ? " " + ed : "") + (ver.Length > 0 ? " " + ver : "") + " (build " + build + (ubr != null ? "." + ubr : "") + ")"
+             + (Environment.Is64BitOperatingSystem ? ", 64-bit" : ", 32-bit");
+    }
+    // The graphics cards in the PC (Windows' device list), with their driver version and date. Without that list, the
+    // installed graphics drivers (which may include a card that was taken out).
+    static List<string> GraphicsCards()
+    {
+        List<string> o = new List<string>();
+        try
+        {
+            using (System.Management.ManagementObjectSearcher q = new System.Management.ManagementObjectSearcher("SELECT Name, DriverVersion, DriverDate FROM Win32_VideoController"))
+            using (System.Management.ManagementObjectCollection all = q.Get())
+                foreach (System.Management.ManagementBaseObject v in all)
+                {
+                    string desc = v["Name"] as string, ver = v["DriverVersion"] as string, date = v["DriverDate"] as string;
+                    if (string.IsNullOrEmpty(desc) || desc.Contains("Basic Display") || desc.Contains("Remote")) continue;
+                    try { if (date != null) date = System.Management.ManagementDateTimeConverter.ToDateTime(date).ToString("M-d-yyyy"); } catch { date = null; }
+                    string line = desc + (ver != null ? ", driver " + ver : "") + (date != null ? " (" + date + ")" : "");
+                    if (!o.Contains(line)) o.Add(line);
+                }
+        }
+        catch { }
+        if (o.Count > 0) return o;
+        try
+        {
+            using (Microsoft.Win32.RegistryKey cls = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"))
+                if (cls != null)
+                    foreach (string sub in cls.GetSubKeyNames().Where(n => n.Length == 4 && n.All(char.IsDigit)))
+                        try
+                        {
+                            using (Microsoft.Win32.RegistryKey k = cls.OpenSubKey(sub))
+                            {
+                                string desc = k == null ? null : k.GetValue("DriverDesc") as string;
+                                if (string.IsNullOrEmpty(desc) || desc.Contains("Basic Display") || desc.Contains("Remote")) continue;
+                                string ver = k.GetValue("DriverVersion") as string, date = k.GetValue("DriverDate") as string;
+                                string line = "driver for " + desc + (ver != null ? ", " + ver : "") + (date != null ? " (" + date + ")" : "");
+                                if (!o.Contains(line)) o.Add(line);
+                            }
+                        }
+                        catch { }
+        }
+        catch { }
+        if (o.Count == 0) o.Add("?");
+        return o;
+    }
+
     void ShowLog()
     {
         if (logForm == null || logForm.IsDisposed)
@@ -1611,14 +2170,36 @@ class EmuForm : Form
             logForm = new Form();
             logForm.Text = "Log"; logForm.Font = Font; logForm.BackColor = Theme.Window; logForm.ForeColor = Theme.Text; logForm.Icon = Icon;
             logForm.ClientSize = new Size(D(760), D(480)); logForm.StartPosition = FormStartPosition.CenterParent; logForm.ShowInTaskbar = false;
-            logForm.Controls.Add(logBox); logForm.Controls.Add(logCopy);
+            logForm.Controls.Add(logBox); logForm.Controls.Add(logCopy); logForm.Controls.Add(logHelp); logForm.Controls.Add(logHint);
             StyleButton(logCopy); logCopy.BackColor = Theme.Window;
-            Action lay = () => { logBox.SetBounds(D(12), D(12), logForm.ClientSize.Width - D(24), logForm.ClientSize.Height - D(64)); logCopy.SetBounds(logForm.ClientSize.Width - D(112), logForm.ClientSize.Height - D(44), D(100), D(32)); };
+            logHelp.Text = "Copy for help"; StyleButton(logHelp); logHelp.BackColor = Theme.Window; Outline(logHelp, Theme.Accent);
+            logHint.Text = "Asking for help on Discord? Click Copy for help, then paste it in your message.";
+            logHint.ForeColor = Theme.Muted; logHint.AutoEllipsis = true; logHint.TextAlign = ContentAlignment.MiddleLeft;
+            logHelp.Click += delegate
+            {
+                string t = HelpText();
+                bool ok = false;
+                for (int i = 0; i < 3 && !ok; i++) try { Clipboard.SetText(t); ok = true; } catch { Thread.Sleep(100); }   // another program may hold the clipboard
+                logHelp.Text = ok ? "Copied" : "Try again";
+                if (ok) Log("Copied the help info (" + t.Length + " characters).");
+                System.Windows.Forms.Timer back = new System.Windows.Forms.Timer(); back.Interval = 2000;
+                back.Tick += delegate { back.Stop(); back.Dispose(); if (!logHelp.IsDisposed) logHelp.Text = "Copy for help"; };
+                back.Start();
+            };
+            Action lay = () =>
+            {
+                int cw = logForm.ClientSize.Width, ch = logForm.ClientSize.Height;
+                logBox.SetBounds(D(12), D(12), cw - D(24), ch - D(64));
+                logCopy.SetBounds(cw - D(112), ch - D(44), D(100), D(32));
+                logHelp.SetBounds(cw - D(112) - D(8) - D(140), ch - D(44), D(140), D(32));
+                logHint.SetBounds(D(12), ch - D(44), Math.Max(D(40), logHelp.Left - D(24)), D(32));
+            };
             logForm.Resize += delegate { lay(); }; lay();
             logForm.FormClosing += delegate (object s, FormClosingEventArgs e) { if (e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; logForm.Hide(); } };
             logForm.HandleCreated += delegate { Native.Apply(logForm.Handle, Theme.Dark, 0); Native.ControlTheme(logBox.Handle, Theme.Dark ? "DarkMode_Explorer" : "Explorer"); };
         }
         logBox.BackColor = Theme.Input; logBox.ForeColor = Theme.Text; logBox.BorderStyle = BorderStyle.FixedSingle;
+        logHint.ForeColor = Theme.Muted; logHint.BackColor = Theme.Window; logHelp.BackColor = logCopy.BackColor = Theme.Window;
         if (!logForm.Visible) logForm.Show(this);
         logForm.Activate();
         logBox.SelectionStart = logBox.TextLength; logBox.ScrollToCaret();
@@ -1635,13 +2216,29 @@ class EmuForm : Form
         for (int i = 0; i < items.Length; i++)
         {
             if (items[i] == null) { m.Items.Add(new ToolStripSeparator()); continue; }
-            string t = (string)items[i]; Action a = (Action)items[++i];
-            ToolStripMenuItem it = new ToolStripMenuItem(t); it.ForeColor = Theme.Text; it.Padding = new Padding(D(4), D(3), D(4), D(3));
-            it.Click += delegate { a(); };
-            m.Items.Add(it);
+            m.Items.Add(MenuItem((string)items[i], items[++i]));
         }
         m.Closed += delegate { BeginInvoke((MethodInvoker)delegate { m.Dispose(); }); };
         return m;
+    }
+
+    // One menu item: an Action, or object[] for a sub-menu (the same "text", Action ... ; null = separator).
+    ToolStripItem MenuItem(string t, object what)
+    {
+        ToolStripMenuItem it = new ToolStripMenuItem(t); it.ForeColor = Theme.Text; it.Padding = new Padding(D(4), D(3), D(4), D(3));
+        object[] sub = what as object[];
+        if (sub == null) { Action a = (Action)what; it.Click += delegate { a(); }; return it; }
+        ToolStripDropDownMenu dd = new ToolStripDropDownMenu();
+        dd.Renderer = new MenuLook(); dd.Padding = new Padding(0, D(4), 0, D(4)); dd.Font = Font; dd.ShowImageMargin = false;
+        dd.HandleCreated += delegate { Native.RoundPopup(dd.Handle); };
+        for (int i = 0; i < sub.Length; i++)
+        {
+            if (sub[i] == null) { dd.Items.Add(new ToolStripSeparator()); continue; }
+            dd.Items.Add(MenuItem((string)sub[i], sub[++i]));
+        }
+        it.DropDown = dd;
+        it.Disposed += delegate { dd.Dispose(); };   // a drop-down set by hand isn't disposed with its item
+        return it;
     }
 
     // A menu fades in over a few frames when it opens.
@@ -1683,24 +2280,81 @@ class EmuForm : Form
         bool inst = Installed(d);
         List<object> items = new List<object>();
         bool free = !IsBusy;
+        // versions
         if (c.Rel != null) { items.Add("What's new"); items.Add((Action)delegate { ShowNotes(c); }); }
         if (free) { items.Add("Choose version..."); items.Add((Action)delegate { ChooseVersion(c); }); }
-        if (free && inst && UserData.IsPortable(d)) { items.Add("Set up keys and firmware"); items.Add((Action)delegate { SetupHelp(c); }); }
-        if (free && inst && !UserData.IsPortable(d)) { items.Add("Keep its saves in its own folder"); items.Add((Action)delegate { MakePortable(c); }); }
         if (free && Core.Backups(d).Count > 0) { items.Add("Go back to previous version"); items.Add((Action)delegate { DoRestore(c); }); }
         if (free && !inst) { items.Add("I already have it"); items.Add((Action)delegate { UseExisting(c); }); }
+        // its data
+        if (free && inst && UserData.IsPortable(d)) { items.Add(null); items.Add("Set up keys and firmware"); items.Add((Action)delegate { SetupHelp(c); }); }
+        if (free && inst && !UserData.IsPortable(d)) { items.Add(null); items.Add("Keep its saves in its own folder"); items.Add((Action)delegate { MakePortable(c); }); }
+        // folders and its page
         items.Add(null);
-        items.Add("Open folder"); items.Add((Action)delegate { Explore(Directory.Exists(d.Dir) ? d.Dir : Path.GetDirectoryName(d.Dir.TrimEnd('\\'))); });
-        items.Add("Open website"); items.Add((Action)delegate
-        {
-            string u = c.Rel != null && c.Rel.Url != null ? c.Rel.Url : d.Host == "gitea" ? d.ApiBase.Replace("/api/v1", "") + "/" + d.Repo + "/releases" : "https://github.com/" + d.Repo + "/releases";
-            try { Process.Start(u); } catch { }
-        });
+        items.Add("Open folder"); items.Add(FolderItems(c));
+        string site = SiteName(d);
+        items.Add("Open on " + site); items.Add((Action)delegate { try { Process.Start(ProjectPage(d)); } catch { } });
+        // name and look
+        items.Add(null);
+        items.Add("Rename..."); items.Add((Action)delegate { RenameEmu(c); });
         items.Add("Edit note"); items.Add((Action)delegate { EditNote(c); });
         items.Add("Change icon..."); items.Add((Action)delegate { ChangeIcon(c); });
         if (File.Exists(IconFile(d))) { items.Add("Reset icon"); items.Add((Action)delegate { ResetIcon(c); }); }
+        items.Add("Switch 1 or Switch 2..."); items.Add((Action)delegate { ChooseSwitch(c); });
         if (free) { items.Add(null); items.Add("Remove from list"); items.Add((Action)delegate { RemoveFork(c); }); }
         return MakeMenu(items.ToArray());
+    }
+
+    // "GitHub", or the name of the Gitea/Forgejo server (git.eden-emu.dev -> "Gitea") for the menu.
+    static string SiteName(EmuDef d) { return d.Host == "gitea" ? "Gitea" : "GitHub"; }
+    // The project's own page (its code, releases and issues).
+    static string ProjectPage(EmuDef d)
+    {
+        if (d.Host == "gitea" && !string.IsNullOrEmpty(d.ApiBase))
+        {
+            string b = d.ApiBase.TrimEnd('/');
+            if (b.EndsWith("/api/v1", StringComparison.OrdinalIgnoreCase)) b = b.Substring(0, b.Length - 7);
+            return b + "/" + d.Repo;
+        }
+        return "https://github.com/" + d.Repo;
+    }
+
+    // "Open folder" > the emulator's folders. Its data is in its own "user" folder (or, for a build that doesn't keep its
+    // own, in %APPDATA%). Keys, firmware and mods folders are made on the click when the emulator has a "user" folder,
+    // since that's where the user puts them; the others open the nearest folder that exists.
+    object[] FolderItems(EmuCard c)
+    {
+        EmuDef d = c.Def;
+        List<object> o = new List<object>();
+        string emuDir = Directory.Exists(d.Dir) ? d.Dir : Path.GetDirectoryName(d.Dir.TrimEnd('\\'));
+        o.Add("Emulator"); o.Add((Action)delegate { Explore(emuDir); });
+        bool own = Installed(d) && UserData.IsPortable(d);
+        string data = own ? Path.Combine(d.Dir, "user") : Installed(d) ? UserData.AppDataSource(d) : null;
+        if (data != null)
+        {
+            o.Add(null);
+            Action<string, string, bool> add = (label, rel, make) =>
+            {
+                string full = Path.Combine(data, rel);
+                o.Add(label); o.Add((Action)delegate { OpenDataFolder(data, full, make && own); });
+            };
+            add("Keys", "keys", true);
+            add("Firmware", @"nand\system\Contents\registered", true);
+            add("Saves", @"nand\user\save", false);
+            add("Mods", "load", true);
+            add("Screenshots", "screenshots", false);
+            add("Log files", "log", false);
+        }
+        if (c.Joined && Directory.Exists(UserData.SharedRoot)) { o.Add(null); o.Add("Shared data"); o.Add((Action)delegate { Explore(UserData.SharedRoot); }); }
+        List<string> older = Core.Backups(d);
+        if (older.Count > 0) { if (!(c.Joined && Directory.Exists(UserData.SharedRoot))) o.Add(null); o.Add("Older versions"); o.Add((Action)delegate { Explore(Path.GetDirectoryName(older[0].TrimEnd('\\'))); }); }
+        return o.ToArray();
+    }
+    void OpenDataFolder(string data, string full, bool make)
+    {
+        if (!Directory.Exists(full) && make) try { Directory.CreateDirectory(full); } catch { }
+        string p = full;
+        while (!Directory.Exists(p) && p.Length > data.Length) p = Path.GetDirectoryName(p);   // not made yet: the nearest one there is
+        Explore(Directory.Exists(p) ? p : data);
     }
 
     // Places buttons left to right from x0, wrapping at maxX; returns the y of the last row.
@@ -1805,6 +2459,7 @@ class EmuForm : Form
 
         // the small tiles: saves, storage and updates once something is installed; the games folder and the manager always
         InfoText();
+        if (games1Shown != ShowSwitch1Games()) GamesText();
         bool any = cards.Any(k => Installed(k.Def));
         savesTile.Visible = storeTile.Visible = updTile.Visible = any;
         List<KeyValuePair<Card, int>> tiles = new List<KeyValuePair<Card, int>>();
@@ -1833,7 +2488,7 @@ class EmuForm : Form
         if (laidOut != ClientSize) { laidOut = ClientSize; buildsPage.Invalidate(true); }
         contentHeight = cy - cardsHost.AutoScrollPosition.Y - gap;
         // an emulator added or removed, or the first one installed (the small tiles appear): the window fits again
-        string key = cards.Count + "|" + any;
+        string key = cards.Count + "|" + any + "|" + games1Shown;
         if (contentKey != null && key != contentKey && IsHandleCreated) BeginInvoke((MethodInvoker)delegate { FitHeight(); });
         contentKey = key;
     }
@@ -2023,7 +2678,7 @@ class EmuForm : Form
         c.Next.Visible = c.NextKind != null && !c.Busy && !IsBusy;
         if (c.Next.Visible) { ly += D(2); c.Next.SetBounds(L, ly, Math.Min(iw, TextRenderer.MeasureText(c.Next.Text, Font).Width + D(8)), D(22)); ly += D(24); }
         if (c.Bar.Visible) { ly += D(6); c.Bar.SetBounds(P, ly, iw, D(8)); ly += D(10); }
-        c.Share.Visible = Installed(c.Def) && UserData.IsPortable(c.Def);
+        c.Share.Visible = Installed(c.Def) && UserData.IsPortable(c.Def) && (UserData.CanJoin(c.Def) || Core.Cfg.ShareHost == c.Def.Id);
         int low = bh + (c.Share.Visible ? D(30) + D(10) : 0) + (c.Existing.Visible ? D(22) + D(10) : 0);
         int natural = ly + D(14) + low + P;
         // measuring only: placing the buttons at this height and then at the row's would make them jump on every
@@ -2070,7 +2725,7 @@ class EmuForm : Form
 
     int InfoHeight(Card t)
     {
-        return t == savesTile ? D(178) : t == storeTile ? D(178) : t == updTile ? D(190) : D(104);
+        return t == savesTile ? D(178) : t == storeTile ? D(178) : t == updTile ? D(206) : t == gamesCard && games1Shown ? D(150) : D(104);
     }
 
     // The small tiles' insides.
@@ -2100,20 +2755,23 @@ class EmuForm : Form
             updCap.SetBounds(P, P, iw, D(20));
             updText.SetBounds(P, P + D(26), iw, D(28));
             updWhen.SetBounds(P, P + D(56), iw, D(20));
-            updBars.SetBounds(P, P + D(84), iw, D(44));
-            updLine.SetBounds(P, P + D(134), iw, D(20));
+            updBars.SetBounds(P, P + D(82), iw, D(62));   // bars and the day names under them
+            updLine.SetBounds(P, P + D(150), iw, D(20));
         }
         else if (t == gamesCard)
         {
             gamesCap.SetBounds(P, P, iw, D(20));
             gamesPick.SetBounds(w - P - D(112), P + D(28), D(112), D(38));
             gamesLbl.SetBounds(P, P + D(32), Math.Max(D(40), iw - D(124)), D(30));
+            games1Pick.SetBounds(w - P - D(112), P + D(74), D(112), D(38));
+            games1Lbl.SetBounds(P, P + D(78), Math.Max(D(40), iw - D(124)), D(30));
         }
         else if (t == mgrTile)
         {
             mgrCap.SetBounds(P, P, iw, D(20));
-            int cw = mgrChip.Visible ? mgrChip.Needed(D(26)) : 0;
+            int cw = mgrGo.Visible ? D(112) : mgrChip.Visible ? mgrChip.Needed(D(26)) : 0;
             mgrChip.SetBounds(w - P - cw, P + D(34), cw, D(26));
+            mgrGo.SetBounds(w - P - D(112), P + D(28), D(112), D(38));
             mgrText.SetBounds(P, P + D(32), Math.Max(D(40), iw - cw - D(10)), D(30));
         }
         t.Invalidate();
@@ -2125,8 +2783,9 @@ class EmuForm : Form
         public int SharedGames, AllGames;                 // games with saves in the shared folder / in any emulator's saves
         public long Emus, Shared, Older, Aside;
         public bool HasSizes;                             // sizes were read (a quick read keeps the last ones)
-        public int[] Days = new int[7];                   // new versions per day, oldest first (today last)
+        public int[] Days = new int[7];                   // new versions per day this week, Sunday first
         public string Key;                                // the installed emulators it was read for
+        public DateTime Day;                              // the day it was read (Days is that day's week)
     }
     string InstalledKey() { return string.Join("|", cards.Where(k => Installed(k.Def)).Select(k => k.Def.Id).OrderBy(x => x)); }
     InfoData info;
@@ -2170,7 +2829,7 @@ class EmuForm : Form
         bool walk = sizes || old == null || !old.HasSizes;
         ThreadPool.QueueUserWorkItem(delegate
         {
-            InfoData r = new InfoData(); r.Key = key;
+            InfoData r = new InfoData(); r.Key = key; r.Day = DateTime.Today;
             List<EmuDef> inst = new List<EmuDef>();
             try { inst = defs.Where(Installed).ToList(); } catch { }
             try
@@ -2202,13 +2861,11 @@ class EmuForm : Form
             if (!walk && old != null) { r.Emus = old.Emus; r.Shared = old.Shared; r.Older = old.Older; r.Aside = old.Aside; r.HasSizes = old.HasSizes; }
             try
             {
-                DateTime today = DateTime.Today;
+                // this week, Sunday to Saturday: Days[0] is Sunday
+                DateTime today = DateTime.Today, sunday = today.AddDays(-(int)today.DayOfWeek);
                 foreach (EmuDef d in inst)
                     foreach (DateTime t in Core.RecentReleaseDates(d))
-                    {
-                        int ago = (today - t.Date).Days;
-                        if (ago >= 0 && ago < 7) r.Days[6 - ago]++;
-                    }
+                        if (t.Date >= sunday && t.Date <= today) r.Days[(int)t.Date.DayOfWeek]++;
             }
             catch (Exception ex) { FileLog("Reading update dates failed: " + ex.Message); if (old != null) r.Days = old.Days; }
             UI(delegate
@@ -2231,6 +2888,13 @@ class EmuForm : Form
             rescanQueued = true;
             BeginInvoke((MethodInvoker)delegate { rescanQueued = false; ScanInfo(true); });
         }
+        else if (r != null && !scanning && !rescanQueued && r.Day != DateTime.Today && IsHandleCreated)
+        {   // past midnight: today's bar (and on Sunday a new week) needs the dates read again
+            rescanQueued = true;
+            BeginInvoke((MethodInvoker)delegate { rescanQueued = false; ScanInfo(true, false); });
+        }
+        DateTime thisSunday = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
+        int[] weekDays = r != null && r.Day.AddDays(-(int)r.Day.DayOfWeek) == thisSunday ? r.Days : new int[7];   // last week's: not shown
         // saves: who shares comes from the cards (Refresh keeps it current), the counts from the last scan
         EmuCard hostCard = Core.Cfg.ShareHost == null ? null : inst.FirstOrDefault(k => k.Def.Id == Core.Cfg.ShareHost && k.Joined);
         bool sharing = hostCard != null;
@@ -2268,18 +2932,28 @@ class EmuForm : Form
         TimeSpan ago = DateTime.Now - checkedAt;
         Txt(updWhen, checkedAt == DateTime.MinValue ? "" : ago.TotalMinutes < 1 ? "Checked just now" : ago.TotalMinutes < 2 ? "Checked 1 minute ago"
                    : ago.TotalMinutes < 60 ? "Checked " + (int)ago.TotalMinutes + " minutes ago" : "Checked at " + checkedAt.ToString("t"));
-        updBars.Values = r != null ? r.Days : new int[7];
+        updBars.Values = weekDays;
+        updBars.Today = (int)DateTime.Today.DayOfWeek;
         updBars.Invalidate();
-        int week = r != null ? r.Days.Sum() : 0;
+        int week = weekDays.Sum();
         Txt(updLine, r == null ? "" : week == 0 ? "No new versions this week" : week == 1 ? "1 new version this week" : week + " new versions this week");
         // manager
-        Txt(mgrText, "Version " + Core.AppVersion + (Core.Portable ? " (portable)" : ""));
-        mgrChip.Visible = mgrChecked && !(anyBusy && mgrRel != null);
-        Txt(mgrChip, mgrRel != null ? "Update to " + mgrVer : "Latest");
-        roles[mgrChip] = mgrRel != null ? "info" : "success";
+        // a newer manager: the tile lights up in the accent and gets a real Update button
+        bool newer = mgrRel != null;
+        Txt(mgrCap, newer ? "Manager update ready" : "Manager");
+        roles[mgrCap] = newer ? "accent" : "muted"; mgrCap.ForeColor = newer ? Theme.Accent : RoleColor(mgrCap);
+        Txt(mgrText, newer ? "Version " + mgrVer + " is out" : "Version " + Core.AppVersion + (Core.Portable ? " (portable)" : ""));
+        tips.SetToolTip(mgrText, newer ? "You have " + Core.AppVersion + (Core.Portable ? " (portable)" : "") : null);
+        bool goShown = newer && !anyBusy;
+        if (mgrGo.Visible != goShown) { mgrGo.Visible = goShown; LayoutSoon(); }
+        mgrGo.Enabled = !IsBusy;
+        Outline(mgrGo, Theme.Accent);
+        mgrChip.Visible = mgrChecked && !newer;
+        Txt(mgrChip, "Latest");
+        roles[mgrChip] = "success";
         mgrChip.ForeColor = RoleColor(mgrChip);
-        mgrChip.Cursor = mgrRel != null ? Cursors.Hand : Cursors.Default;
-        tips.SetToolTip(mgrChip, mgrRel != null ? "Click to update the manager" : null);
+        Color edge = newer ? Theme.Accent : Color.Empty;
+        if (mgrTile.Edge != edge || mgrTile.Glow != edge) { mgrTile.Edge = edge; mgrTile.Glow = edge; mgrTile.Invalidate(true); }
     }
 
     // Two letters for an emulator: "Eglantine Main" -> EM, "PokeDinner" -> PD, "Lichii" -> LI.
@@ -2314,31 +2988,60 @@ class EmuForm : Form
             Rectangle cr = new Rectangle(c0.X - wr.X, c0.Y - wr.Y, ClientSize.Width, ClientSize.Height);
             Bitmap pic = whole.Clone(cr, PixelFormat.Format32bppArgb);
             whole.Dispose();
+            Opaque(pic, Native.Build >= 22000 && WindowState == FormWindowState.Normal ? (int)Math.Round(8 * Card.K) : 0);
             FadeForm f = new FadeForm();
             f.FormBorderStyle = FormBorderStyle.None; f.ShowInTaskbar = false; f.StartPosition = FormStartPosition.Manual;
             f.Bounds = new Rectangle(c0, ClientSize);
             f.BackColor = Theme.Window;
-            f.BackgroundImage = pic; f.BackgroundImageLayout = ImageLayout.None;
-            f.Opacity = 0.999;
-            f.Disposed += delegate { pic.Dispose(); };
+            f.SetPicture(pic);   // before it shows: its first frame is the picture
+            pic.Dispose();
             IntPtr above = GetWindow(Handle, 3);   // GW_HWNDPREV: the window just above the main window, before the picture exists
             f.Show(this);
             if (above != IntPtr.Zero) Native.Below(f.Handle, above);   // right on the main window: its other windows stay on top
             else if (keepOnTop != null && !keepOnTop.IsDisposed) Native.Raise(keepOnTop.Handle);
-            f.Update();
             return f;
         }
         catch (Exception ex) { FileLog("No colour fade: " + ex.Message); return null; }
     }
+    // The picture fully opaque (the window's own alpha can be anything), with its corners cut round like the window's
+    // on Windows 11 (radius r, 0 = square).
+    static void Opaque(Bitmap b, int r)
+    {
+        BitmapData d = b.LockBits(new Rectangle(0, 0, b.Width, b.Height), ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
+        try
+        {
+            byte[] row = new byte[d.Stride];
+            for (int y = 0; y < b.Height; y++)
+            {
+                IntPtr at = d.Scan0 + y * d.Stride;
+                Marshal.Copy(at, row, 0, d.Stride);
+                for (int x = 0; x < b.Width; x++)
+                {
+                    bool cut = false;
+                    if (r > 0)
+                    {
+                        int cx = x < r ? r : x >= b.Width - r ? b.Width - r - 1 : -1, cy = y < r ? r : y >= b.Height - r ? b.Height - r - 1 : -1;
+                        if (cx >= 0 && cy >= 0) { double dx = x - cx, dy = y - cy; cut = dx * dx + dy * dy > r * r; }
+                    }
+                    int i = x * 4;
+                    if (cut) { row[i] = row[i + 1] = row[i + 2] = row[i + 3] = 0; } else row[i + 3] = 255;
+                }
+                Marshal.Copy(row, 0, at, d.Stride);
+            }
+        }
+        finally { b.UnlockBits(d); }
+    }
     static void CrossFade(Form f)
     {
         System.Windows.Forms.Timer t = new System.Windows.Forms.Timer(); t.Interval = 15;
-        Stopwatch sw = Stopwatch.StartNew();
+        Stopwatch sw = new Stopwatch();
         t.Tick += delegate
         {
+            if (!sw.IsRunning) { sw.Start(); return; }   // the first tick comes after the new look has painted
             double v = Math.Min(1, sw.ElapsedMilliseconds / 260.0);
             if (v >= 1 || f.IsDisposed) { t.Stop(); t.Dispose(); if (!f.IsDisposed) f.Close(); return; }
-            f.Opacity = 1 - v * v * (3 - 2 * v);
+            FadeForm ff = f as FadeForm;
+            if (ff != null) ff.Alpha((int)Math.Round(255 * (1 - v * v * (3 - 2 * v))));
         };
         t.Start();
     }
@@ -2352,15 +3055,25 @@ class EmuForm : Form
         f.Text = "Themes"; f.Font = Font; f.Icon = Icon; f.ShowInTaskbar = false;
         f.FormBorderStyle = FormBorderStyle.FixedDialog; f.MaximizeBox = false; f.MinimizeBox = false;
         f.StartPosition = FormStartPosition.CenterParent;
-        const int cols = 4;   // a row per colour family
+        const int cols = 5;   // a row per colour family
         int sw = D(150), sh = D(104), g = D(12), W = D(24) * 2 + sw * cols + g * (cols - 1);
+        // the swatches scroll when they don't all fit on the screen (a small screen or a big text size)
+        Panel grid = new Panel(); grid.AutoScroll = true;
+        int rowsN = (Theme.Schemes.Length + cols - 1) / cols, gridH = rowsN * (sh + g) - g + D(4);
+        int room = Screen.FromControl(this).WorkingArea.Height - D(54) - D(38) - D(20) - D(30) - SystemInformation.CaptionHeight - D(40);
+        if (Demo != null && Environment.GetEnvironmentVariable("NS2_DEMO_SMALLSCREEN") == "1") room = D(330);   // test: a small screen
+        bool scroll = gridH > room;
+        int gh = scroll ? Math.Max(sh + g, room) : gridH;
+        grid.SetBounds(D(24), D(54), sw * cols + g * (cols - 1) + (scroll ? SystemInformation.VerticalScrollBarWidth + D(6) : 0), gh);
+        if (scroll) W += SystemInformation.VerticalScrollBarWidth + D(6);
+        f.Controls.Add(grid);
         ToolTip ftips = new ToolTip(); f.Disposed += delegate { ftips.Dispose(); };
         Label t = new Label(); t.Text = "Pick the colors you like."; t.SetBounds(D(24), D(18), W - D(48), D(24)); f.Controls.Add(t);
         List<Swatch> all = new List<Swatch>();
         Button done = new Button(); done.Text = "Done";
         Action paint = () =>
         {
-            f.BackColor = Theme.Window; t.ForeColor = Theme.Muted; t.BackColor = Theme.Window;
+            f.BackColor = Theme.Window; t.ForeColor = Theme.Muted; t.BackColor = Theme.Window; grid.BackColor = Theme.Window;
             done.BackColor = Theme.Window; done.ForeColor = Theme.Text;
             foreach (Swatch x in all) x.Invalidate();
             done.Invalidate();
@@ -2379,10 +3092,10 @@ class EmuForm : Form
         for (int i = 0; i < Theme.Schemes.Length; i++)
         {
             Swatch x = new Swatch(); x.Scheme = Theme.Schemes[i];
-            x.SetBounds(D(24) + (i % cols) * (sw + g), D(54) + (i / cols) * (sh + g), sw, sh);
+            x.SetBounds((i % cols) * (sw + g), D(2) + (i / cols) * (sh + g), sw, sh);
             ftips.SetToolTip(x, x.Scheme[1]);
             x.Click += delegate { choose(x); };
-            all.Add(x); f.Controls.Add(x);
+            all.Add(x); grid.Controls.Add(x);
         }
         if (Demo != null && Demo.StartsWith("colors:"))
         {   // test: pick a scheme by itself a moment after opening (the fade from one look to the other)
@@ -2391,15 +3104,15 @@ class EmuForm : Form
             dt.Start();
         }
         Swatch cur = all.FirstOrDefault(k => k.Scheme[0] == Theme.Scheme);
-        if (cur != null) f.ActiveControl = cur;   // the keyboard starts on the colours in use
-        int by = D(54) + (Theme.Schemes.Length + cols - 1) / cols * (sh + g) + D(6);
+        if (cur != null) { f.ActiveControl = cur; f.Shown += delegate { grid.ScrollControlIntoView(cur); }; }   // the keyboard starts on the colours in use
+        int by = grid.Bottom + D(18);
         done.SetBounds(W - D(24) - D(110), by, D(110), D(38));
         StyleButton(done); Outline(done, Theme.Accent);
         done.Click += delegate { f.Close(); };
         f.Controls.Add(done);
         f.AcceptButton = done; f.CancelButton = done;
         f.ClientSize = new Size(W, by + D(38) + D(20));
-        f.HandleCreated += delegate { Native.Apply(f.Handle, true, 0); };
+        f.HandleCreated += delegate { Native.Apply(f.Handle, true, 0); Native.ControlTheme(grid.Handle, "DarkMode_Explorer"); };
         paint();
         if (Demo == null) { f.ShowDialog(this); f.Dispose(); colorsForm = null; return; }
         f.StartPosition = FormStartPosition.Manual;   // a screenshot: over the main window, wherever that is
@@ -2412,6 +3125,7 @@ class EmuForm : Form
         EmuCard c = new EmuCard(); c.Def = d;
         c.Box.Text = ""; c.Box.Shift = 0; c.Box.Radius = D(20); c.Box.Hover = true;
         c.Title.Text = d.Name; c.Title.AutoEllipsis = true; fontRoles[c.Title] = "name";
+        c.Title.UseMnemonic = c.Data.UseMnemonic = c.State.UseMnemonic = c.Note.UseMnemonic = c.Ver.UseMnemonic = false;   // "R&D" shows as typed
         c.Badge.Text = Initials(d.Name);
         c.Badge.Picture = PictureOf(d);
         c.Note.AutoEllipsis = true; roles[c.Note] = "muted";
@@ -2481,6 +3195,7 @@ class EmuForm : Form
             c.Joined = hostDef == d || all;
             if (hostDef == d) c.Data.Text = "Your other emulators use this data.";
             else if (all) c.Data.Text = "Uses " + hostDef.Name + "'s data.";
+            else if (!UserData.CanJoin(d)) c.Data.Text = "Not sharing: Switch 1 emulators keep their own data.";
             else
             {   // not joined yet: say what it waits for
                 string why; joinWhy.TryGetValue(d.Id, out why);
@@ -2533,6 +3248,8 @@ class EmuForm : Form
         {
             Release r = null; Version v = null; string err = null;
             try { r = Core.ManagerUpdate(fresh, out v); } catch (Exception ex) { err = ex.Message; }
+            string fake = Core.Cfg.Sandbox ? Environment.GetEnvironmentVariable("NS2_DEMO_MGRUPDATE") : null;
+            if (!string.IsNullOrEmpty(fake) && Version.TryParse(fake, out v)) { r = new Release { Tag = "v" + fake, Name = fake }; err = null; }
             UI(delegate
             {
                 if (err != null) { FileLog("Manager update check failed: " + err); return; }
@@ -2540,7 +3257,7 @@ class EmuForm : Form
                 mgrLink.Text = r != null ? "Update the manager to " + v : "";
                 mgrLink.Visible = r != null && !anyBusy;
                 if (r != null) Log("A newer manager is out: " + v + " (this one is " + Core.AppVersion + ").");
-                DoLayout();
+                InfoText(); DoLayout();
             });
         });
     }
@@ -2738,7 +3455,7 @@ class EmuForm : Form
     void JoinSharing(EmuCard c)
     {
         if (Core.Cfg.ShareHost == null || !UserData.CanShare) return;   // a drive without links (FAT32 / exFAT): sharing waits for one that has them
-        List<EmuCard> need = cards.Where(k => (c == null || k == c) && Installed(k.Def) && UserData.IsPortable(k.Def) && !joinWhy.ContainsKey(k.Def.Id) &&
+        List<EmuCard> need = cards.Where(k => (c == null || k == c) && Installed(k.Def) && UserData.IsPortable(k.Def) && UserData.CanJoin(k.Def) && !joinWhy.ContainsKey(k.Def.Id) &&
                                               UserData.HostItems.Any(i => UserData.StateOf(k.Def, i) != UserData.State.On)).ToList();
         if (need.Count == 0) return;
         if (IsBusy || installQueue.Count > 0 || addingFound > 0) { joinPending = true; return; }
@@ -2781,7 +3498,7 @@ class EmuForm : Form
             bool stopping = Core.Cfg.ShareBackups != null || Core.Cfg.ShareMerged != null;   // a stop that didn't finish: don't turn sharing back on
             if (Core.Cfg.ShareHost == null && !stopping)
             {
-                EmuCard full = cards.FirstOrDefault(k => Installed(k.Def) && UserData.IsPortable(k.Def) && UserData.HostItems.All(i => UserData.StateOf(k.Def, i) == UserData.State.On));
+                EmuCard full = cards.FirstOrDefault(k => Installed(k.Def) && UserData.IsPortable(k.Def) && UserData.CanJoin(k.Def) && UserData.HostItems.All(i => UserData.StateOf(k.Def, i) == UserData.State.On));
                 if (full != null) { Core.Cfg.ShareHost = full.Def.Id; Core.Cfg.ShareNew = UserData.HostItems.Select(i => i.Key).ToList(); changed = true; Log("Sharing was on: " + full.Def.Name + " is ticked."); }
                 else if (Core.Cfg.ShareNew != null) { Core.Cfg.ShareNew = null; changed = true; }
             }
@@ -2801,6 +3518,7 @@ class EmuForm : Form
         if (IsBusy) { PleaseWait(); return; }
         if (!UserData.CanShare) { Tell("Share data", UserData.NO_SHARE); RefreshAll(); return; }
         EmuDef d = c.Def;
+        if (!UserData.CanJoin(d) && Core.Cfg.ShareHost != d.Id) { Tell("Share data", UserData.SWITCH1_OWN); RefreshAll(); return; }
         List<EmuCard> inst = cards.Where(k => Installed(k.Def) && UserData.IsPortable(k.Def)).ToList();
         EmuDef host = Core.Cfg.ShareHost == null ? null : Core.Cfg.Emulators.FirstOrDefault(x => x.Id == Core.Cfg.ShareHost);
         List<string> open = inst.Where(k => Core.Running(k.Def).Count > 0).Select(k => k.Def.Name).ToList();
@@ -3420,16 +4138,35 @@ class EmuForm : Form
             Card gr = new Card(); gr.Text = ""; gr.Shift = 0; gr.SetBounds(D(16), y, W - D(32), D(50)); f.Controls.Add(gr);
             Label gv = new Label(); gv.SetBounds(D(14), D(14), W - D(190), D(22)); gv.AutoEllipsis = true; gr.Controls.Add(gv);
             Button gb = new Button(); gb.SetBounds(W - D(152), D(8), D(104), D(34)); gr.Controls.Add(gb);
+            bool two = ShowSwitch1Games();
             Action showG = () =>
             {
                 bool set = !string.IsNullOrEmpty(Core.Cfg.GamesFolder);
-                gv.Text = set ? "Games: " + Core.Cfg.GamesFolder : "Choose the folder with your games (optional).";
+                gv.Text = set ? (two ? "Switch 2 games: " : "Games: ") + Core.Cfg.GamesFolder : two ? "Choose the folder with your Switch 2 games (optional)." : "Choose the folder with your games (optional).";
                 gb.Text = set ? "Change..." : "Choose...";
             };
             showG();
-            gb.Click += delegate { PickGames(); showG(); };
+            gv.UseMnemonic = false;
+            gb.Click += delegate { PickGames(2); showG(); };
             foreach (Control k in gr.Controls) { k.BackColor = Theme.Card; k.ForeColor = Theme.Text; }
             y += D(58);
+            Button gb1 = null;
+            if (two)
+            {   // a Switch 1 emulator is on the list: its games folder too
+                Card gr1 = new Card(); gr1.Text = ""; gr1.Shift = 0; gr1.SetBounds(D(16), y, W - D(32), D(50)); f.Controls.Add(gr1);
+                Label gv1 = new Label(); gv1.SetBounds(D(14), D(14), W - D(190), D(22)); gv1.AutoEllipsis = true; gv1.UseMnemonic = false; gr1.Controls.Add(gv1);
+                gb1 = new Button(); gb1.SetBounds(W - D(152), D(8), D(104), D(34)); gr1.Controls.Add(gb1);
+                Action showG1 = () =>
+                {
+                    bool set = !string.IsNullOrEmpty(Core.Cfg.Games1Folder);
+                    gv1.Text = set ? "Switch 1 games: " + Core.Cfg.Games1Folder : "Choose the folder with your Switch 1 games (optional).";
+                    gb1.Text = set ? "Change..." : "Choose...";
+                };
+                showG1();
+                gb1.Click += delegate { PickGames(1); showG1(); };
+                foreach (Control k in gr1.Controls) { k.BackColor = Theme.Card; k.ForeColor = Theme.Text; }
+                y += D(58);
+            }
             y += D(6);   // sharing is a tick on each emulator's card
             LinkLabel link = new LinkLabel(); link.Text = "Add from link..."; link.SetBounds(D(16), y + D(8), D(160), D(22));
             link.LinkColor = link.ActiveLinkColor = link.VisitedLinkColor = Theme.Accent; link.LinkBehavior = LinkBehavior.HoverUnderline; f.Controls.Add(link);
@@ -3438,7 +4175,7 @@ class EmuForm : Form
             Button later = new Button(); later.Text = first ? "Not now" : "Close"; later.SetBounds(W - D(124), y, D(108), D(36)); f.Controls.Add(later);
             go.Click += delegate { f.DialogResult = DialogResult.OK; f.Close(); };
             later.DialogResult = DialogResult.Cancel; f.CancelButton = later;
-            foreach (Button b in new[] { go, later, gb }) { StyleButton(b); b.BackColor = b == gb ? Theme.Card : Theme.Window; }
+            foreach (Button b in new[] { go, later, gb, gb1 }) { if (b == null) continue; StyleButton(b); b.BackColor = b == gb || b == gb1 ? Theme.Card : Theme.Window; }
             Outline(go, Theme.Accent);
             f.ClientSize = new Size(W, y + D(52));
             f.HandleCreated += delegate { Native.Apply(f.Handle, Theme.Dark, 0); };
@@ -3787,9 +4524,48 @@ class EmuForm : Form
         }
     }
 
-    void Fail(EmuCard c, string msg)
+    // The name on the card (and in "Uses ...'s data", the log and the Save Helper). Only the name: its folder,
+    // saves and icon stay as they are.
+    void RenameEmu(EmuCard c)
     {
-        Log(c.Def.Name + ": " + msg); c.Err = msg; c.State.Text = msg; roles[c.State] = "danger"; c.State.ForeColor = RoleColor(c.State);
+        string old = c.Def.Name ?? "";
+        using (Form f = new Form())
+        {
+            f.Text = "Rename " + old; f.FormBorderStyle = FormBorderStyle.FixedDialog; f.MinimizeBox = f.MaximizeBox = false; f.ShowInTaskbar = false;
+            f.StartPosition = FormStartPosition.CenterParent; f.ClientSize = new Size(D(460), D(140)); f.Font = Font; f.BackColor = Theme.Window; f.ForeColor = Theme.Text;
+            Label l = new Label(); l.Text = "Name:"; l.SetBounds(D(14), D(12), D(430), D(20));
+            TextBox tb = new TextBox(); tb.Text = old; tb.MaxLength = 40; tb.SetBounds(D(14), D(36), D(432), D(24)); tb.BackColor = Theme.Input; tb.ForeColor = Theme.Text; tb.BorderStyle = BorderStyle.FixedSingle;
+            Label msg = new Label(); msg.UseMnemonic = false; msg.Text = "Its folder and saves stay the same."; msg.ForeColor = Theme.Muted; msg.SetBounds(D(14), D(66), D(432), D(20));
+            Button ok = new Button(); ok.Text = "Save"; ok.SetBounds(D(262), D(94), D(88), D(34));
+            Button no = new Button(); no.Text = "Cancel"; no.SetBounds(D(358), D(94), D(88), D(34)); no.DialogResult = DialogResult.Cancel;
+            string chosen = null;
+            ok.Click += delegate
+            {
+                string n = Core.DisplayName(new EmuDef { Name = tb.Text, Repo = c.Def.Repo });
+                if (tb.Text.Trim().Length == 0) { msg.Text = "Type a name."; msg.ForeColor = Theme.Danger; tb.Focus(); return; }
+                EmuDef same = Core.Cfg.Emulators.FirstOrDefault(x => x != c.Def && string.Equals((x.Name ?? "").Trim(), n, StringComparison.OrdinalIgnoreCase));
+                if (same != null) { msg.Text = "Another emulator is already called " + same.Name + "."; msg.ForeColor = Theme.Danger; tb.Focus(); tb.SelectAll(); return; }
+                chosen = n; f.DialogResult = DialogResult.OK;
+            };
+            tb.TextChanged += delegate { msg.Text = "Its folder and saves stay the same."; msg.ForeColor = Theme.Muted; };
+            f.AcceptButton = ok; f.CancelButton = no;
+            f.Controls.AddRange(new Control[] { l, tb, msg, ok, no });
+            StyleButton(ok); StyleButton(no); ok.BackColor = no.BackColor = Theme.Window; Outline(ok, Theme.Accent);
+            f.HandleCreated += delegate { Native.Apply(f.Handle, Theme.Dark, 0); };
+            f.Shown += delegate { tb.Focus(); tb.SelectAll(); };
+            if (f.ShowDialog(this) != DialogResult.OK || chosen == null || chosen == old) return;
+            try { Core.ClaimBackups(c.Def); } catch (Exception ex) { FileLog("Rename: older builds not marked: " + ex.Message); }
+            c.Def.Name = chosen;
+            try { Core.SaveConfig(); Log("Renamed " + old + " to " + chosen + "."); }
+            catch (Exception ex) { c.Def.Name = old; Log("Could not save the new name: " + ex.Message); Fail(c, "Couldn't save the new name."); return; }
+            foreach (EmuCard k in cards) if (k.Err != null && k.Err.Contains(old)) k.Err = null;   // old messages named it by its old name
+            RefreshAll();   // other cards say "Uses <name>'s data"
+        }
+    }
+
+    void Fail(EmuCard c, string msg, string logMsg = null)   // logMsg: a longer text for the log
+    {
+        Log(c.Def.Name + ": " + (logMsg ?? msg)); c.Err = msg; c.State.Text = msg; roles[c.State] = "danger"; c.State.ForeColor = RoleColor(c.State);
         tips.SetToolTip(c.State, msg + "\r\nClick to see details.");
     }
 
@@ -4172,6 +4948,10 @@ class EmuForm : Form
         {
             Core.LoadConfig(cfg);
             if (sandbox && !Core.Cfg.Sandbox) { Core.Cfg.Sandbox = true; Core.SaveConfig(); }
+            // the installed manager (only that one: a copy elsewhere leaves it for the installed one) takes its files
+            // out of AppData into its own folder
+            if (!sandbox && !custom && !Core.Portable && InstalledHere(exeDir))
+                try { string mv = Core.MoveOldDataDir(); if (mv != null) FileLog(mv); } catch (Exception ex) { FileLog("Couldn't move the old AppData folder: " + ex.Message); }
         }
         catch (Exception ex)
         {
@@ -4356,7 +5136,13 @@ class EmuForm : Form
                     log(d.Id + " launch: " + (UserData.LaunchProblem(d) ?? "ok"));
                 }
                 else if (a[i] == "games")
-                    foreach (EmuDef d in Core.Cfg.Emulators) log(d.Id + ": " + (Core.SyncGamesFolder(d, null) ?? "no change"));
+                    foreach (EmuDef d in Core.Cfg.Emulators) log(d.Id + " (Switch " + Core.SwitchOf(d) + "): " + (Core.SyncGamesFolder(d, null, 0) ?? "no change"));
+                else if (a[i] == "previous-version")   // test: which version ran before (for "What's new"); test environment only
+                    log(Core.Cfg.Sandbox ? "previous: " + (PreviousVersion() == null ? "none" : PreviousVersion().ToString()) : "test environment only");
+                else if (a[i] == "move-old-data")   // test: the first-start move out of AppData (test environment, NS2_TEST_OLD_DATADIR)
+                    log(Core.Cfg.Sandbox ? (Core.MoveOldDataDir() ?? "nothing to move") : "test environment only");
+                else if (a[i] == "games-launch")   // what the check before each launch does (only takes the other Switch's folder out)
+                    foreach (EmuDef d in Core.Cfg.Emulators) log(d.Id + " (Switch " + Core.SwitchOf(d) + "): " + (Core.SyncGamesFolder(d, null, 0, false) ?? "no change"));
                 else if (a[i] == "update" || a[i] == "restore")
                 {
                     string id = a[++i];

@@ -21,7 +21,7 @@ using Microsoft.Win32;
 
 static class SetupApp
 {
-    public const string APP = "NS2 Emulator Manager", VERSION = "1.3.8", PUBLISHER = "NS2 Emulator Manager";
+    public const string APP = "NS2 Emulator Manager", VERSION = "1.3.16", PUBLISHER = "NS2 Emulator Manager";
     public const string KEY = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Switch2EmulatorManager";
     public static string DesktopLnk { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "NS2 Emulator Manager.lnk"); } }
     public static string StartLnk { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "NS2 Emulator Manager.lnk"); } }
@@ -135,7 +135,7 @@ static class SetupApp
     }
 
     // Every step also goes to %TEMP%\emu-manager-setup.log, so a setup that stopped partway can be explained.
-    public static readonly string LogFile = Path.Combine(Path.GetTempPath(), "emu-manager-setup.log");
+    public static readonly string LogFile = Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), "setup.log");
     public static void FileLog(string s) { try { File.AppendAllText(LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + s + "\r\n"); } catch { } }
 
     // Returns warnings ("" when everything worked). The app files and the Apps & features entry must succeed; the
@@ -166,7 +166,8 @@ static class SetupApp
         if (File.Exists(exe))
         {   // the old one is kept until the new one is in place: a failure halfway never leaves the folder without a manager
             string bak = exe + ".old";
-            if (File.Exists(bak)) File.Delete(bak);
+            if (File.Exists(bak))   // left from an earlier update; if it can't go (read-only, held by antivirus), another name
+                try { File.SetAttributes(bak, FileAttributes.Normal); File.Delete(bak); } catch { bak = exe + ".old-" + DateTime.Now.Ticks; }
             File.Move(exe, bak);
             try { File.Move(tmp, exe); } catch { File.Move(bak, exe); throw; }
             try { File.Delete(bak); } catch { }
@@ -251,8 +252,12 @@ static class SetupApp
         foreach (string f in new[] { "EmuManager.next.exe", "EmuManager.exe.new", "EmuManager.exe.old" }) try { File.Delete(Path.Combine(dir, f)); } catch { }
         try { foreach (string f in Directory.GetFiles(dir, "EmuManager-*.ico")) File.Delete(f); } catch { }   // the shortcuts' icon
         if (settings)
-            foreach (string f in new[] { "emulators.json", "emulators.json.tmp", "manager.log" })
+        {
+            foreach (string f in new[] { "emulators.json", "emulators.json.tmp", "emulators.json.bak", "manager.log" })
                 if (File.Exists(Path.Combine(dir, f))) { File.Delete(Path.Combine(dir, f)); log("Removed " + f); }
+            string md = Path.Combine(dir, ".manager-data");   // the manager's own files (log, icons, caches)
+            try { if (Directory.Exists(md)) { Directory.Delete(md, true); log("Removed .manager-data"); } } catch { }
+        }
         if (registryAndShortcuts)
         {
             foreach (string l in new[] { DesktopLnk, StartLnk }.Concat(OldLnks))

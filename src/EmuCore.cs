@@ -26,6 +26,7 @@ public class EmuDef
     public string Dir { get; set; }             // install folder
     public string Exe { get; set; }             // exe the Launch button starts
     public bool Added { get; set; }             // the user put it on the list (installed / existing install / new fork)
+    public int SwitchVersion { get; set; }      // 1 = a Switch 1 emulator (Eden, Ryujinx...), 2 = Switch 2; 0 = not decided yet (worked out from its repository)
 }
 
 public class Config
@@ -33,7 +34,8 @@ public class Config
     public List<EmuDef> Emulators { get; set; }
     public int KeepPrevious { get; set; }
     public string Theme { get; set; }           // system / light / dark
-    public string GamesFolder { get; set; }     // one games folder every build lists (written into each qt-config.ini)
+    public string GamesFolder { get; set; }     // the Switch 2 games folder every Switch 2 build lists (written into each qt-config.ini)
+    public string Games1Folder { get; set; }    // the Switch 1 games folder, for Switch 1 emulators (Eden...) instead
     public List<string> NoInstallPrompt { get; set; }   // ids the user told "don't ask again" about installing
     public bool Sandbox { get; set; }           // test environment (--sandbox DIR): shown in the title, can be reset
     public List<string> ShareNew { get; set; }  // UserData item keys new builds share from the start (null = none)
@@ -106,6 +108,22 @@ public static class Core
     {
         Release best = ManagerRelease(null, fresh, out newest);
         return best != null && newest > AppVersion ? best : null;
+    }
+
+    // The manager's releases after "after", up to and including "upTo", newest first (for "What's new" after an update).
+    public static List<KeyValuePair<Version, Release>> ManagerNotes(Version after, Version upTo)
+    {
+        List<KeyValuePair<Version, Release>> o = new List<KeyValuePair<Version, Release>>();
+        foreach (Dictionary<string, object> r in ReleasesJson("github", null, MANAGER_REPO, 1, false).OfType<Dictionary<string, object>>())
+        {
+            if (S(r, "draft") == "True" || S(r, "prerelease") == "True") continue;
+            Version v;
+            if (!Version.TryParse((S(r, "tag_name") ?? "").TrimStart('v', 'V'), out v)) continue;
+            v = new Version(v.Major, v.Minor, Math.Max(0, v.Build));
+            if (v <= after || v > upTo || o.Any(k => k.Key == v)) continue;
+            o.Add(new KeyValuePair<Version, Release>(v, MakeRelease(r, new Dictionary<string, object>())));   // only the notes are used
+        }
+        return o.OrderByDescending(k => k.Key).ToList();
     }
 
     // The newest manager release (want == null) or the one with version want.
@@ -216,6 +234,15 @@ public static class Core
             renamed = true;
         }
         foreach (EmuDef e in Cfg.Emulators) { string n = DisplayName(e); if (n != e.Name) { e.Name = n; renamed = true; } }
+        foreach (EmuDef e in Cfg.Emulators)   // lists saved before 1.3.10: which Switch each emulator is for
+            if (e.SwitchVersion != 1 && e.SwitchVersion != 2 && !string.IsNullOrEmpty(e.Exe)) { e.SwitchVersion = DetectSwitch(e); renamed = true; }
+        // lists saved before Switch 1 support had one games folder for every emulator: the Switch 1 emulators keep it
+        // (nothing disappears from their game list); a separate Switch 1 folder can be chosen on the Games folder tile
+        if (Cfg.Games1Folder == null)
+        {
+            Cfg.Games1Folder = Cfg.Emulators.Any(e => e.SwitchVersion == 1) && !string.IsNullOrEmpty(Cfg.GamesFolder) ? Cfg.GamesFolder : "";
+            renamed = true;
+        }
         foreach (EmuDef e in Cfg.Emulators)   // a repository that moved: its new name (GitHub forwards the old one)
             if (e.Host == "github" && !string.IsNullOrEmpty(e.Repo) && CanonRepo(e.Repo) != e.Repo) { e.Repo = CanonRepo(e.Repo); renamed = true; }
         foreach (EmuDef e in Cfg.Emulators)   // 1.1.x wording of the recommended note
@@ -294,6 +321,8 @@ public static class Core
         }
         string g = move(Cfg.GamesFolder);
         if (g != Cfg.GamesFolder) { Cfg.GamesFolder = g; changed = true; }
+        string g1 = move(Cfg.Games1Folder);
+        if (g1 != Cfg.Games1Folder) { Cfg.Games1Folder = g1; changed = true; }
         if (Cfg.ShareBackups != null)
             foreach (string id in Cfg.ShareBackups.Keys.ToList())
             {
@@ -324,7 +353,7 @@ public static class Core
     public static Config DefaultConfig(string home)
     {
         Config c = new Config();
-        c.KeepPrevious = 2; c.Theme = "system"; c.GamesFolder = ""; c.NoInstallPrompt = new List<string>();
+        c.KeepPrevious = 2; c.Theme = "system"; c.GamesFolder = ""; c.Games1Folder = ""; c.NoInstallPrompt = new List<string>();
         c.Emulators = new List<EmuDef>();
         return c;
     }
@@ -1045,16 +1074,69 @@ public static class Core
     // ---- where things go
     // Build folders: wherever their card says (recommended ones: <install folder>\<Display name>). Older builds: one
     // "Older builds" folder next to the build folders (same drive, so moves are instant), entries named
-    // "<Name> <version> (older)". Downloads, the log and the list of known installs live in the app's own data folder
-    // (%LOCALAPPDATA%\Switch2EmulatorManager; inside the test folder for a test environment), never among the builds.
+    // "<Name> <version> (older)". Downloads, the log, icons and the list of known installs live in the app's own data
+    // folder, <install folder>\.manager-data (installed, portable and test environment alike): nothing in AppData.
     public const string OLDER = "Older builds";
-    public static string DataDir
+    public static string DataDir { get { return Path.Combine(Home, ".manager-data"); } }
+    // Where 1.3.9 and older kept it (installed manager only).
+    public static string OldDataDir { get { string t = Environment.GetEnvironmentVariable("NS2_TEST_OLD_DATADIR"); if (!string.IsNullOrEmpty(t) && Cfg != null && Cfg.Sandbox) return t; return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Switch2EmulatorManager"); } }
+
+    // The installed manager's first start after 1.3.9 (before its window shows, so it must be quick): the small files in
+    // the old AppData folder (icons, known installs, the log) move into .manager-data. Downloaded zips, manager updates
+    // and release lists can be hundreds of MB and a slow copy to another drive, and they're only kept to be downloaded
+    // again later, so they're removed instead (the manager removes them itself after each install anyway).
+    // A file already in .manager-data is the newer one: the old copy goes to the Recycle Bin. The old folder is removed
+    // once it's empty. Returns what happened, or null.
+    static readonly string[] OldCaches = { "downloads", "manager-update", "cache" };
+    public static string MoveOldDataDir()
     {
-        get
+        string old = OldDataDir, nd = DataDir;
+        if (!Directory.Exists(old) || string.Equals(FullDir(old), FullDir(nd), StringComparison.OrdinalIgnoreCase)) return null;
+        Directory.CreateDirectory(nd);
+        int moved = 0, kept = 0;
+        long dropped = 0;
+        foreach (string c in OldCaches)
         {
-            return Cfg != null && Cfg.Sandbox || Portable ? Path.Combine(Home, ".manager-data")
-                 : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Switch2EmulatorManager");
+            string d = Path.Combine(old, c);
+            if (!Directory.Exists(d)) continue;
+            long size = 0;
+            try { size = new DirectoryInfo(d).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length); } catch { }
+            try { Directory.Delete(d, true); dropped += size; } catch { }   // a file in use: what's left stays, as before
         }
+        Action<string, string> merge = null;
+        merge = (from, to) =>
+        {
+            Directory.CreateDirectory(to);
+            foreach (string f in Directory.GetFiles(from))
+            {
+                string t = Path.Combine(to, Path.GetFileName(f));
+                try
+                {
+                    if (string.Equals(Path.GetFileName(f), "manager.log", StringComparison.OrdinalIgnoreCase) && File.Exists(t))
+                    {   // the new log has started already: the old lines go first
+                        File.WriteAllText(t, File.ReadAllText(f) + File.ReadAllText(t)); File.Delete(f); moved++;
+                    }
+                    else if (File.Exists(t))
+                    {   // already there (the newer one): the old copy to the Recycle Bin
+                        Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(f, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin); moved++;
+                    }
+                    else { File.Move(f, t); moved++; }   // a rename on the same drive, a copy to another
+                }
+                catch { kept++; }
+            }
+            foreach (string d in Directory.GetDirectories(from))
+            {
+                merge(d, Path.Combine(to, Path.GetFileName(d)));
+                try { if (!Directory.EnumerateFileSystemEntries(d).Any()) Directory.Delete(d); } catch { }
+            }
+        };
+        merge(old, nd);
+        bool gone = false;
+        try { if (!Directory.EnumerateFileSystemEntries(old).Any()) { Directory.Delete(old); gone = true; } } catch { }
+        if (moved == 0 && dropped == 0 && gone) return null;
+        return "Moved the manager's own files (" + moved + ") from " + old + " to " + nd
+             + (dropped > 0 ? "; removed old downloads and caches (" + (dropped + 1048575) / 1048576 + " MB, they download again when needed)" : "")
+             + (gone ? "; that AppData folder is gone." : "; " + kept + " stayed there (in use).");
     }
     static string DownloadsDir(EmuDef e) { return Path.Combine(DataDir, "downloads", e.Id ?? "build"); }
 
@@ -1255,6 +1337,19 @@ public static class Core
         return all.Where(d => !string.Equals(Path.GetFullPath(d).TrimEnd('\\'), live, StringComparison.OrdinalIgnoreCase))
                   .Distinct(StringComparer.OrdinalIgnoreCase)
                   .OrderByDescending(d => Directory.GetCreationTimeUtc(d)).ThenByDescending(d => d).ToList();
+    }
+
+    // Older builds that are this emulator's only by their folder name (kept by early versions, no id in their manifest):
+    // stamps the id and repository in, so they stay this emulator's when its name changes.
+    public static void ClaimBackups(EmuDef e)
+    {
+        foreach (string d in Backups(e))
+        {
+            Manifest m = LoadManifest(d);
+            if (m == null || !string.IsNullOrEmpty(m.Id)) continue;
+            m.Id = e.Id; if (string.IsNullOrEmpty(m.Repo)) m.Repo = e.Repo;
+            SaveManifest(d, m);
+        }
     }
 
     // "PokeDinner (fork) 1.5.0 (older)", made unique with " 2", " 3"... if that version is kept twice.
@@ -1576,6 +1671,27 @@ public static class Core
     // Other Eden-family emulator exes (for the "another emulator is running" warning).
     public static readonly string[] FamilyExes = { "eden.exe", "yuzu.exe", "citron.exe", "sudachi.exe", "suyu.exe", "torzu.exe", "eglantine.exe", "lichii.exe" };
 
+    // Which Switch an emulator plays. Eglantine and its forks are Switch 2 (the manager's own list, "eglantine" in the
+    // repository, eglantine.exe / lichii.exe); Eden, Ryujinx, Citron, Sudachi, yuzu, suyu and torzu are Switch 1. Anything
+    // else is taken as Switch 2 (what this manager is for); the card's menu changes it.
+    static readonly string[] Switch1Names = { "eden", "ryujinx", "ryubing", "citron", "sudachi", "yuzu", "yuzu-mainline", "suyu", "torzu" };
+    static readonly string[] Switch1Exes = { "eden.exe", "ryujinx.exe", "yuzu.exe", "citron.exe", "sudachi.exe", "suyu.exe", "torzu.exe" };
+    public static int DetectSwitch(EmuDef e)
+    {
+        string repo = CanonRepo(e.Repo ?? "").ToLowerInvariant(), exe = (e.Exe ?? "").ToLowerInvariant();
+        if (repo.Contains("eglantine") || exe == "eglantine.exe" || exe == "lichii.exe" || IsMainRepo(e)) return 2;
+        try { if (Recommended(Home).Any(r => SameRepo(e.Host, e.Repo, r.Host, r.Repo))) return 2; } catch { }
+        string[] parts = repo.Split('/');
+        string owner = parts[0], name = parts.Length > 1 ? parts[1] : "";
+        if (Switch1Names.Contains(name) || Switch1Names.Any(n => owner == n || owner == n + "-emu")) return 1;
+        if (Switch1Exes.Contains(exe)) return 1;
+        return 2;
+    }
+    public static int SwitchOf(EmuDef e) { return e.SwitchVersion == 1 || e.SwitchVersion == 2 ? e.SwitchVersion : DetectSwitch(e); }
+    // The games folder this emulator lists: the Switch 1 one for Switch 1 emulators, else the Switch 2 one.
+    public static string GamesFolderFor(EmuDef e) { return SwitchOf(e) == 1 ? Cfg.Games1Folder : Cfg.GamesFolder; }
+    public static string GamesFolderOf(int sw) { return sw == 1 ? Cfg.Games1Folder : Cfg.GamesFolder; }
+
     public static Process Launch(EmuDef e)
     {
         string exe = Path.Combine(e.Dir, e.Exe);
@@ -1597,10 +1713,23 @@ public static class Core
     static readonly Regex GameDir = new Regex(@"^Paths\\gamedirs\\(\d+)\\path=(.*)$");
     const string GD = "Paths\\gamedirs\\";
 
+    static string QtValue(string v)
+    {
+        if (v.IndexOfAny(new[] { ',', ';', '=', '"' }) < 0 && v.Trim() == v) return v;
+        return "\"" + v.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+    }
+    static string QtUnquote(string v)
+    {
+        v = v.Trim();
+        if (v.Length < 2 || v[0] != '"' || v[v.Length - 1] != '"') return v;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 1; i < v.Length - 1; i++) { if (v[i] == '\\' && i + 1 < v.Length - 1) i++; sb.Append(v[i]); }
+        return sb.ToString();
+    }
     static string[] DirLines(int k, string path, bool deep)
     {
         string b = GD + k + "\\";
-        return new[] { b + "path=" + path, b + "deep_scan\\default=" + (deep ? "false" : "true"), b + "deep_scan=" + (deep ? "true" : "false"),
+        return new[] { b + "path=" + QtValue(path), b + "deep_scan\\default=" + (deep ? "false" : "true"), b + "deep_scan=" + (deep ? "true" : "false"),
                        b + "expanded\\default=true", b + "expanded=true" };
     }
 
@@ -1608,7 +1737,7 @@ public static class Core
     // the first start already lists the games instead of asking for a folder. Everything else stays at its default.
     static void SeedGamesIni(EmuDef e, Action<string> log)
     {
-        string want = Norm(Cfg.GamesFolder), ini = GamesIni(e);
+        string want = Norm(GamesFolderFor(e)), ini = GamesIni(e);
         if (want == null || File.Exists(ini)) return;
         Directory.CreateDirectory(Path.GetDirectoryName(ini));
         List<string> L = new List<string> { "[UI]", GD + "size=4" };
@@ -1618,15 +1747,31 @@ public static class Core
         log("Set its game folder to " + want + " (new qt-config.ini holding only the game list).");
     }
 
-    // Makes sure the build lists the games folder (deep scan on). Replaces the entry of the previous shared folder if
-    // there is one, else adds an entry; other folders the user added stay. Returns a message, or null if nothing changed.
-    public static string SyncGamesFolder(EmuDef e, string previous)
+    // Makes sure the build lists its games folder (the Switch 1 one for a Switch 1 emulator, else the Switch 2 one), with
+    // deep scan on, and not the other Switch's folder (a Switch 1 emulator can't play Switch 2 games and scanning them takes
+    // a long time). previous/previousFor: the folder that setting had before it changed (1 or 2: which one), so its entry
+    // is replaced (or, in an emulator of the other Switch, taken out). Folders the user added stay as they are.
+    // Returns a message, or null if nothing changed.
+    public static string SyncGamesFolder(EmuDef e, string previous, int previousFor) { return SyncGamesFolder(e, previous, previousFor, true); }
+    public static string SyncGamesFolder(EmuDef e, string previous, int previousFor, bool addOwn)
     {
-        string want = Norm(Cfg.GamesFolder), prev = Norm(previous), ini = GamesIni(e);
-        if (want == null || string.IsNullOrEmpty(e.Exe) || !File.Exists(Path.Combine(e.Dir, e.Exe)) || !Directory.Exists(Path.Combine(e.Dir, "user"))) return null;
+        int sw = SwitchOf(e);
+        string want = Norm(GamesFolderOf(sw)), other = Norm(GamesFolderOf(sw == 1 ? 2 : 1)), prev = Norm(previous), ini = GamesIni(e);
+        Func<string, string, bool> same = (x, y) => x != null && y != null && string.Equals(x.TrimEnd('/'), y.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+        if (same(other, want)) other = null;                                   // one folder for both: nothing to take out
+        string otherPrev = null;
+        if (prev != null && previousFor != 0 && previousFor != sw) { otherPrev = prev; prev = null; }   // the other Switch's old folder
+        if (same(otherPrev, want)) otherPrev = null;
+        if (same(prev, want)) prev = null;
+        if (want == null && other == null && otherPrev == null) return null;
+        if (string.IsNullOrEmpty(e.Exe) || string.IsNullOrEmpty(e.Dir) || !File.Exists(Path.Combine(e.Dir, e.Exe)) || !Directory.Exists(Path.Combine(e.Dir, "user"))) return null;
         if (Cfg.Sandbox && FolderProblem(e, e.Dir) != null) return null;   // test environment: never edit a build outside it
-        if (Running(e).Count > 0) return e.Name + " is running; close it, then press Apply to all builds again.";
-        if (!File.Exists(ini)) { SeedGamesIni(e, s => { }); return e.Name + ": game folder set to " + want + " (new config)."; }
+        if (!File.Exists(ini))
+        {
+            if (want == null) return null;
+            if (Running(e).Count > 0) return e.Name + " is open, so its game list wasn't changed. It's done the next time it starts from here.";
+            SeedGamesIni(e, x => { }); return e.Name + ": game folder set to " + want + " (new config).";
+        }
         string raw = File.ReadAllText(ini, Encoding.UTF8);
         string nl = raw.Contains("\r\n") ? "\r\n" : "\n";
         List<string> L = raw.Replace("\r\n", "\n").Split('\n').ToList();
@@ -1635,6 +1780,8 @@ public static class Core
         int sizeAt = L.FindIndex(l => l.StartsWith(GD + "size="));
         if (sizeAt < 0)
         {   // no game list yet: add one to [UI] (or a new [UI] section)
+            if (want == null) return null;
+            if (Running(e).Count > 0) return e.Name + " is open, so its game list wasn't changed. It's done the next time it starts from here.";
             int ui = L.FindIndex(l => l.Trim() == "[UI]");
             List<string> add = new List<string> { GD + "size=4" };
             add.AddRange(DirLines(1, "SDMC", false)); add.AddRange(DirLines(2, "UserNAND", false)); add.AddRange(DirLines(3, "SysNAND", false));
@@ -1643,44 +1790,59 @@ public static class Core
             return Write(e, ini, L, nl, trailing, e.Name + ": game list created with " + want + ".");
         }
         int size; int.TryParse(L[sizeAt].Substring(L[sizeAt].IndexOf('=') + 1), out size);
-        int hit = -1, prevHit = -1;
-        for (int i = 0; i < L.Count; i++)
+        // the entries 1..size, each as its keys after "Paths\gamedirs\N\" (path=..., deep_scan=..., ...), in order
+        List<List<string>> slots = new List<List<string>>();
+        for (int k = 1; k <= size; k++)
         {
-            Match m = GameDir.Match(L[i]);
-            if (!m.Success) continue;
-            int k = int.Parse(m.Groups[1].Value);
-            if (k > size) continue;
-            string p = m.Groups[2].Value.Trim().TrimEnd('/');
-            if (string.Equals(p, want, StringComparison.OrdinalIgnoreCase)) hit = k;
-            else if (prev != null && string.Equals(p, prev, StringComparison.OrdinalIgnoreCase)) prevHit = k;
-            else if (prevHit < 0 && p.StartsWith(want + "/", StringComparison.OrdinalIgnoreCase))
-            { prevHit = k; prev = p; }   // a subfolder of the games folder: widen it instead of listing its games twice
+            string pre = GD + k + "\\";
+            slots.Add(L.Where(l => l.StartsWith(pre)).Select(l => l.Substring(pre.Length)).ToList());
         }
-        bool changed = false;
-        string msg = e.Name + ": game folder " + want + " added to its game list.";
-        if (hit < 0 && prevHit > 0)
+        Func<List<string>, string> pathOf = sl => { string pl = sl.FirstOrDefault(x => x.StartsWith("path=")); return pl == null ? null : QtUnquote(pl.Substring(5)).Replace('\\', '/').TrimEnd('/'); };
+        List<string> msgs = new List<string>();
+        foreach (string drop in new[] { other, otherPrev })
+        {   // a Switch 1 emulator: the Switch 2 games folder out of its list (it can't play them, and scanning them is slow)
+            if (drop == null || sw != 1) continue;
+            int n = slots.RemoveAll(sl => same(pathOf(sl), drop));
+            if (n > 0) msgs.Add(e.Name + ": " + drop + " taken out of its game list (" + (sw == 1 ? "Switch 2" : "Switch 1") + " games).");
+        }
+        if (want != null && addOwn)
         {
-            int at = L.FindIndex(l => l.StartsWith(GD + prevHit + "\\path="));
-            L[at] = GD + prevHit + "\\path=" + want; hit = prevHit; changed = true;
-            msg = e.Name + ": game folder changed from " + prev + " to " + want + ".";
+            List<string> hit = slots.FirstOrDefault(sl => same(pathOf(sl), want));
+            if (hit == null)
+            {   // the old folder of this setting, or a subfolder of the games folder (widened instead of listing its games twice)
+                List<string> old = slots.FirstOrDefault(sl => same(pathOf(sl), prev))
+                                ?? slots.FirstOrDefault(sl => pathOf(sl) != null && pathOf(sl).StartsWith(want.TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase));
+                if (old != null)
+                {
+                    string was = pathOf(old);
+                    old[old.FindIndex(x => x.StartsWith("path="))] = "path=" + QtValue(want); hit = old;
+                    msgs.Add(e.Name + ": game folder changed from " + was + " to " + want + ".");
+                }
+                else
+                {
+                    string pre = GD + "0\\";
+                    hit = DirLines(0, want, true).Select(l => l.Substring(pre.Length)).ToList(); slots.Add(hit);
+                    msgs.Add(e.Name + ": game folder " + want + " added to its game list.");
+                }
+            }
+            int ds = hit.IndexOf("deep_scan=false");
+            if (ds >= 0)
+            {   // Qt only reads the value when its "\default" flag is false
+                hit[ds] = "deep_scan=true";
+                int dd = hit.IndexOf("deep_scan\\default=true");
+                if (dd >= 0) hit[dd] = "deep_scan\\default=false";
+                if (msgs.Count == 0) msgs.Add(e.Name + ": deep scan turned on for " + want + ".");
+            }
         }
-        if (hit < 0)
-        {
-            int k = size + 1;
-            L.RemoveAll(l => l.StartsWith(GD + k + "\\"));       // stale unused slot
-            int last = L.FindLastIndex(l => l.StartsWith(GD));
-            L.InsertRange(last + 1, DirLines(k, want, true));
-            sizeAt = L.FindIndex(l => l.StartsWith(GD + "size="));
-            L[sizeAt] = GD + "size=" + k; hit = k; changed = true;
-        }
-        int ds = L.FindIndex(l => l == GD + hit + "\\deep_scan=false");
-        if (ds >= 0)
-        {   // Qt only reads the value when its "\default" flag is false
-            L[ds] = GD + hit + "\\deep_scan=true"; changed = true;
-            int dd = L.FindIndex(l => l == GD + hit + "\\deep_scan\\default=true");
-            if (dd >= 0) L[dd] = GD + hit + "\\deep_scan\\default=false";
-        }
-        return changed ? Write(e, ini, L, nl, trailing, msg) : null;
+        if (msgs.Count == 0) return null;
+        if (Running(e).Count > 0) return e.Name + " is open, so its game list wasn't changed. It's done the next time it starts from here.";
+        // the whole list again, numbered 1..n where it was (entries past the old size were unused: left out)
+        int at = L.FindIndex(l => l.StartsWith(GD));
+        L.RemoveAll(l => l.StartsWith(GD));
+        List<string> block = new List<string> { GD + "size=" + slots.Count };
+        for (int k = 0; k < slots.Count; k++) block.AddRange(slots[k].Select(x => GD + (k + 1) + "\\" + x));
+        L.InsertRange(Math.Min(at, L.Count), block);
+        return Write(e, ini, L, nl, trailing, string.Join(" ", msgs));
     }
 
     static string Write(EmuDef e, string ini, List<string> L, string nl, bool trailing, string msg)

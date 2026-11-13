@@ -25,18 +25,29 @@ Made by **Riskbreak** (Discord).
 - **Updates** with one click. The version you replace is kept, so you can go back.
 - **Choose any version** from a list of every release (each card's "..." menu).
 - **Finds emulators you already have**, so nothing is downloaded twice.
-- **Updates itself** from this page when a new version is out.
+- **Updates itself** from this page when a new version is out, and shows what changed.
 
 **💾 Your saves, kept safe**
-- **Each emulator uses its own folder.** Nothing goes in `%APPDATA%`.
-- **Share data with other emulators:** tick it on one emulator and all of them use its keys, firmware and saves, so
-  your progress follows you. Saves for different games are combined, and nothing is deleted. When you stop, choose
-  whether the others keep the latest saves or restore their own.
+- **Everything stays in the manager's folder:** each emulator it installs keeps its saves in its own folder, and the
+  manager's own files are in `.manager-data`. The manager puts nothing in AppData. (An emulator you already had may still
+  use AppData until you choose **Keep its saves in its own folder** in its "..." menu.)
+- **Share data with other emulators:** tick it on one Switch 2 emulator and the others use its keys, firmware and saves,
+  so your progress follows you. Saves for different games are combined, and nothing is deleted. When you stop, choose
+  whether the others keep the latest saves or restore their own. (Not on FAT32 or exFAT drives, like most USB sticks:
+  there each emulator keeps its own.)
 - **Save Helper** shows where every emulator's saves are, the backups, and how to back them up.
+- **Open any of its folders** (keys, firmware, saves, mods, screenshots) from each card's "..." menu.
 
 **🎨 Make it yours**
-- **16 themes** from the Themes button at the top.
-- **Each emulator's own logo** on its card.
+- **25 themes** from the Themes button at the top.
+- **Each emulator's own logo** on its card, or a picture of your choice.
+- **Rename** any emulator from its card's "..." menu.
+
+**🕹️ Switch 1 emulators too**
+- Add Eden and other Switch 1 emulators like it (Citron, Sudachi...) from a link. Choose a **Switch 1 games folder** on
+  the Games folder tile: they show only those games and skip your Switch 2 games, so their game list opens faster.
+- They keep their own keys, firmware and saves (shared data is for Switch 2 emulators). Set to the wrong Switch? Change
+  it with **Switch 1 or Switch 2...** in the card's "..." menu.
 
 **🎒 Portable if you want it**
 - A **no-install version** that keeps everything in one folder, for a USB stick, a games drive or a backup you can
@@ -47,7 +58,7 @@ Made by **Riskbreak** (Discord).
 | First start | Already have them? |
 |:---:|:---:|
 | <img src="docs/welcome.png" alt="Welcome window: tick the emulators you want, then click Install"> | <img src="docs/welcome-already-installed.png" alt="Emulators already in the folder are added without downloading them again"> |
-| **Choose any version** | **16 themes** |
+| **Choose any version** | **25 themes** |
 | <img src="docs/choose-version.png" alt="The list of every release, from each card's ... menu"> | <img src="docs/themes.png" alt="The Themes window"> |
 | **No emulators yet** | **Setup** |
 | <img src="docs/no-emulators.png" alt="The main window with no emulators: one click to pick some"> | <img src="docs/setup.png" alt="The setup window"> |
@@ -70,15 +81,17 @@ It installs for your user only (no admin needed). Uninstall from **Settings > Ap
 Want to keep everything on a USB stick, a games drive, or in one folder you can copy? Download
 `NS2EmulatorManager-Portable.zip` instead, extract it where you want it, and open **EmuManager.exe**.
 
-- **Nothing is added to Windows:** no Apps & features entry, no shortcuts.
-- **Everything stays in that folder:** the manager's settings, your emulators and their saves. Copy the whole folder to
-  back it up or take it to another PC. It finds its way again even if the drive letter changes.
-- **Updates itself** like the installed version, and still adds nothing to Windows.
+It works just like the installed version. The differences:
+
+- **Nothing is added to Windows:** no Apps & features entry, no shortcuts, no Uninstall. To remove it, delete its folder.
+- **Every emulator stays inside its folder**, so copying the whole folder takes everything with it: to back it up or to
+  use it on another PC. It finds its way again even if the drive letter changes.
 - **Removed things** go to the folder's own `Removed items` folder (USB sticks have no Recycle Bin).
+- **Updates itself** like the installed version, and still adds nothing to Windows.
 
 > [!NOTE]
 > **USB sticks formatted as FAT32 or exFAT** (most of them) can't share saves between emulators, so each one keeps its
-> own. NTFS drives can.
+> own. NTFS drives can. This applies to the installed version too.
 
 > [!IMPORTANT]
 > Keep `portable.txt` next to `EmuManager.exe`. It's what makes it portable.
@@ -88,7 +101,13 @@ Want to keep everything on a USB stick, a games drive, or in one folder you can 
 > [!IMPORTANT]
 > The emulators need keys and firmware **from your own Switch**. This tool doesn't download or include them.
 
-Each emulator's card shows simple steps to add them.
+Each emulator's card shows simple steps to add them. If an emulator closes right after you open it, the manager tries
+to tell you why (missing keys or firmware, an old graphics driver...) and how to fix it.
+
+## 🆘 Need help?
+
+Open **Show log** (bottom right) and click **Copy for help**, then paste it on Discord. It has what's usually needed
+to help you, and your Windows user folder is hidden.
 
 ## 🛠️ Build from source
 

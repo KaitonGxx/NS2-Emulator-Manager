@@ -44,7 +44,7 @@ public static class UserData
     {
         get
         {
-            if (!Core.Portable) return true;   // installed: CheckLinks' test link decides, as before
+            // installed or portable: the drive with the manager's folder (and its Shared data) must hold folder links
             string home = Core.Home ?? "";
             if (canShareFor == home) return canShare;
             bool ok = true;
@@ -61,6 +61,10 @@ public static class UserData
             return ok;
         }
     }
+    // Shared data is for Switch 2 emulators: a Switch 1 emulator (Eden...) needs its own firmware, and Switch 2 system
+    // saves are no use to it. It never joins (one that joined in an older version stays until sharing stops).
+    public static bool CanJoin(EmuDef e) { return Core.SwitchOf(e) != 1; }
+    public const string SWITCH1_OWN = "Switch 1 emulators keep their own keys, firmware and saves. Shared data is for Switch 2 emulators.";
     public const string NO_SHARE = "This drive can't share saves between emulators (most USB sticks can't). Each emulator keeps its own.";
 
     // A shared-data link that points into "...\Shared data\<item>" somewhere other than this folder's Shared data (the
@@ -569,7 +573,7 @@ public static class UserData
     public static List<string> ShareForNewBuild(EmuDef e, Action<string> log)
     {
         List<string> failed = new List<string>();
-        if (Core.Cfg.ShareNew == null) return failed;
+        if (Core.Cfg.ShareNew == null || !CanJoin(e)) return failed;
         foreach (string k in Core.Cfg.ShareNew)
         {
             Item it = Find(k);
