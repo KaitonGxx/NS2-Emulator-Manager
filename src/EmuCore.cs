@@ -39,7 +39,9 @@ public class Config
     public List<string> NoInstallPrompt { get; set; }   // ids the user told "don't ask again" about installing
     public bool Sandbox { get; set; }           // test environment (--sandbox DIR): shown in the title, can be reset
     public List<string> ShareNew { get; set; }  // UserData item keys new builds share from the start (null = none)
-    public string ShareHost { get; set; }
+    public string ShareHost { get; set; }       // Switch 2 sharing: the emulator whose data the others use (null = none)
+    public string Share1Host { get; set; }      // the same for Switch 1 emulators (their own "Shared data (Switch 1)")
+    public List<string> Share1New { get; set; } // ShareNew for Switch 1 emulators
     public Dictionary<string, List<string>> ShareBackups { get; set; }   // id -> Set aside folders with its own saves (this sharing), for "Go back"
     public Dictionary<string, List<string>> ShareMerged { get; set; }    // id -> "its path|shared path" of saves/DLC it added to the shared ones       // id of the emulator whose data all of them use (its card is ticked); null = no sharing
     public List<string> NoSetupReminder { get; set; }   // emulator ids whose card doesn't say "Next: add your keys / firmware"
@@ -52,6 +54,7 @@ public class Config
 public class Release
 {
     public string Tag, Name, Body, Url, Published, Asset, AssetUrl, Sha256;   // Sha256 null when the host gives none
+    public bool Linked;     // no file is attached to the release: AssetUrl is a link from its notes (LinkedFiles)
     public string ApiUrl;   // GitHub only: the same file through the API (a second route when the download link fails)
     public long Size;
 }
@@ -100,6 +103,8 @@ public static class Core
     public const string MANAGER_ZIP = "NS2EmulatorManager.zip";
 
     // This manager's version (1.2.13).
+    // For people to read: "1.4.0", or "1.4.0 test 1" for a test build (the 4th part); comparisons use AppVersion.
+    public static string AppLabel { get { Version v = typeof(Core).Assembly.GetName().Version; return AppVersion.ToString(3) + (v.Revision > 0 ? " test " + v.Revision : ""); } }
     public static Version AppVersion { get { Version v = typeof(Core).Assembly.GetName().Version; return new Version(v.Major, v.Minor, Math.Max(0, v.Build)); } }
 
     // The newest release of the manager on GitHub (tag v1.2.14 with NS2EmulatorManager.zip), or null when there's none
@@ -333,8 +338,11 @@ public static class Core
                     string n = move(l[i]);
                     if (n == l[i] && !string.IsNullOrEmpty(l[i]) && !Directory.Exists(l[i]))
                     {   // Set aside folders always live in <folder>\Shared data\Set aside
-                        int k = l[i].IndexOf("\\" + UserData.SHARED + "\\", StringComparison.OrdinalIgnoreCase);
-                        if (k >= 0) { string t = home + l[i].Substring(k); if (Directory.Exists(t)) n = t; }
+                        foreach (string sh in new[] { UserData.SHARED, UserData.SHARED1 })
+                        {
+                            int k = l[i].IndexOf("\\" + sh + "\\", StringComparison.OrdinalIgnoreCase);
+                            if (k >= 0) { string t = home + l[i].Substring(k); if (Directory.Exists(t)) { n = t; break; } }
+                        }
                     }
                     if (n != l[i]) { l[i] = n; changed = true; }
                 }
@@ -573,9 +581,91 @@ public static class Core
         rel.Asset = S(asset, "name"); rel.AssetUrl = S(asset, "browser_download_url");
         string au = S(asset, "url"); if (au != null && au.StartsWith("https://api.github.com/", StringComparison.OrdinalIgnoreCase)) rel.ApiUrl = au;
         long sz; long.TryParse(S(asset, "size"), out sz); rel.Size = sz;
+        rel.Linked = S(asset, "linked") == "True";
         string dg = S(asset, "digest");
         if (dg != null && dg.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase)) rel.Sha256 = dg.Substring(7).ToLowerInvariant();
         return rel;
+    }
+
+    // ---- files linked from a release's notes
+    // Some projects attach nothing to their releases and link the files from the notes instead (Eden's nightlies since
+    // September 2026: git.eden-emu.dev/eden-ci/nightly links nightly.eden-emu.dev/<tag>/Eden-Windows-...zip). For a
+    // release with NO attached files at all, the links in its notes that pass every check below become its files, and
+    // the usual name rules (e.Assets) pick the Windows zip as for attached ones. A link counts only when:
+    //  - it is https, without a user name, port, query or #part;
+    //  - it is on the release server's own site but not the Git server itself: a host under the server's parent domain
+    //    (git.eden-emu.dev: eden-emu.dev and *.eden-emu.dev, not git.eden-emu.dev, where a link to a file can only be
+    //    another repository's or another release's). On GitHub only github.com/<repo>/releases/download/<tag>/;
+    //  - a folder of its path is exactly the release's tag, so it's this release's file and not another's;
+    //  - it names a .zip file.
+    // Releases with attached files are left exactly as they are.
+    static readonly Regex NotesLink = new Regex(@"https://[^\s<>""'`()\[\]{}|\\^]+", RegexOptions.IgnoreCase);
+    // test: the files LinkedFiles takes from one made-up release (CLI "linked-test")
+    public static List<string> LinkedFilesFor(string host, string apiBase, string repo, string tag, string body, bool attached)
+    {
+        Dictionary<string, object> r = new Dictionary<string, object> { { "tag_name", tag }, { "body", body }, { "assets", attached ? new object[] { new Dictionary<string, object> { { "name", "x.zip" } } } : new object[0] } };
+        LinkedFiles(new object[] { r }, host, apiBase, repo);
+        return ((object[])r["assets"]).OfType<Dictionary<string, object>>().Where(a => S(a, "linked") == "True").Select(a => S(a, "browser_download_url")).ToList();
+    }
+    static void LinkedFiles(object[] list, string host, string apiBase, string repo)
+    {
+        string site = host == "gitea" ? SiteOf(apiBase) : null, apiHost = null;
+        if (host == "gitea") { Uri au; if (site == null || !Uri.TryCreate(apiBase, UriKind.Absolute, out au)) return; apiHost = au.Host.ToLowerInvariant(); }
+        foreach (Dictionary<string, object> r in list.OfType<Dictionary<string, object>>())
+        {
+            object[] attached = r.ContainsKey("assets") ? r["assets"] as object[] : null;
+            if (attached != null && attached.Length > 0) continue;
+            string tag = S(r, "tag_name"), body = S(r, "body");
+            if (string.IsNullOrEmpty(tag) || string.IsNullOrEmpty(body)) continue;
+            List<object> files = new List<object>();
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (Match m in NotesLink.Matches(body))
+            {
+                string u = m.Value.TrimEnd('.', ',', ';', ':', '!', '?', '*', '_', '~');
+                string file = LinkedFile(u, host, site, apiHost, repo, tag);
+                if (file == null || !seen.Add(u)) continue;
+                files.Add(new Dictionary<string, object> { { "name", file }, { "browser_download_url", u }, { "size", "0" }, { "linked", "True" } });
+            }
+            if (files.Count > 0) r["assets"] = files.ToArray();
+        }
+    }
+    // The file name when u passes the checks above, else null.
+    static string LinkedFile(string u, string host, string site, string apiHost, string repo, string tag)
+    {
+        Uri uri;
+        if (!Uri.TryCreate(u, UriKind.Absolute, out uri) || uri.Scheme != Uri.UriSchemeHttps) return null;
+        if (!string.IsNullOrEmpty(uri.UserInfo) || !uri.IsDefaultPort || uri.Query.Length > 0 || uri.Fragment.Length > 0) return null;
+        string h = uri.Host.ToLowerInvariant();
+        string[] segs = uri.AbsolutePath.Split('/').Where(x => x.Length > 0).Select(x => Uri.UnescapeDataString(x)).ToArray();
+        if (segs.Length < 2) return null;
+        string file = segs[segs.Length - 1];
+        if (!file.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || file.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || file.StartsWith(".")) return null;
+        if (host == "gitea")
+        {
+            if (h == apiHost || (h != site && !h.EndsWith("." + site, StringComparison.Ordinal))) return null;
+            if (!segs.Take(segs.Length - 1).Any(x => string.Equals(x, tag, StringComparison.Ordinal))) return null;
+        }
+        else
+        {
+            string want = "/" + repo + "/releases/download/" + tag + "/";
+            if (h != "github.com" || !uri.AbsolutePath.StartsWith(want, StringComparison.OrdinalIgnoreCase) || segs.Length != repo.Split('/').Length + 4) return null;
+        }
+        return file;
+    }
+    // The site a Gitea / Forgejo server belongs to: "https://git.eden-emu.dev/api/v1" -> "eden-emu.dev". A two-part host
+    // (codeberg.org) is itself; a parent like "co.uk" or "com.br" is never widened to.
+    static string SiteOf(string apiBase)
+    {
+        Uri u;
+        if (string.IsNullOrEmpty(apiBase) || !Uri.TryCreate(apiBase, UriKind.Absolute, out u)) return null;
+        string h = u.Host.ToLowerInvariant();
+        if (u.HostNameType != UriHostNameType.Dns) return h;   // an IP address: only itself
+        string[] p = h.Split('.');
+        if (p.Length < 3) return h;
+        string parent = string.Join(".", p.Skip(1));
+        string[] q = parent.Split('.');
+        bool suffix = q.Length == 2 && q[1].Length == 2 && new[] { "co", "com", "net", "org", "gov", "edu", "ac", "or", "ne", "go" }.Contains(q[0]);
+        return suffix ? h : parent;
     }
 
     // ---- recognising a build that is already on disk
@@ -705,7 +795,7 @@ public static class Core
         foreach (string own in new[] { "downloads", "previous" })
             if (inside(d, Path.Combine(home, own))) return "That's one of the manager's own folders (" + own + ").";
         if (inside(d, FullDir(DataDir))) return "That's the manager's own data folder.";
-        if (inside(d, FullDir(UserData.SharedRoot))) return "That's the shared data folder.";
+        if (inside(d, FullDir(UserData.RootFor(2))) || inside(d, FullDir(UserData.RootFor(1)))) return "That's the shared data folder.";
         if (string.Equals(Path.GetFileName(d), OLDER, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(Path.GetFileName(Path.GetDirectoryName(d) ?? ""), OLDER, StringComparison.OrdinalIgnoreCase))
             return "That's an \"" + OLDER + "\" folder; pick the build's own folder.";
@@ -739,18 +829,24 @@ public static class Core
         }
         long size = new FileInfo(exe).Length;
         uint? crc = null;
-        int checkedZips = 0, noRange = 0;
+        int checkedZips = 0, checkedRels = 0, noRange = 0;
         object[] list = ReleasesJson(e.Host, e.ApiBase, e.Repo);
+        List<string> kinds = e.Assets ?? new List<string>();
         foreach (Dictionary<string, object> r in list.OfType<Dictionary<string, object>>().OrderByDescending(x => ParseDate(S(x, "published_at") ?? S(x, "created_at"))))
         {
             if (S(r, "draft") == "True") continue;
             object[] assets = r.ContainsKey("assets") ? r["assets"] as object[] : null;
             if (assets == null) continue;
-            foreach (Dictionary<string, object> a in assets.OfType<Dictionary<string, object>>())
+            // its Windows zips, the kind this card installs first (a nightly can have five kinds)
+            List<Dictionary<string, object>> wins = assets.OfType<Dictionary<string, object>>().Where(a => WinZip.IsMatch(S(a, "name") ?? ""))
+                .OrderBy(a => { string n = S(a, "name") ?? ""; int k = kinds.FindIndex(p => Regex.IsMatch(n, p)); return k < 0 ? int.MaxValue : k; }).ToList();
+            if (wins.Count == 0) continue;
+            if (checkedRels >= 40 || checkedZips >= 120) { if (id.Rel == null) id.Why = "not one of the last " + checkedRels + " releases (an older or self-built copy)"; return id; }
+            checkedRels++;
+            foreach (Dictionary<string, object> a in wins)
             {
                 string an = S(a, "name") ?? "";
-                if (!WinZip.IsMatch(an)) continue;
-                if (checkedZips >= 40) { if (id.Rel == null) id.Why = "not one of the last 40 releases (an older or self-built copy)"; return id; }
+                if (checkedZips >= 120) break;
                 checkedZips++;
                 if (progress != null) progress("checking " + (S(r, "tag_name") ?? "") + " " + an);
                 List<ZipEntryInfo> zd;
@@ -776,7 +872,7 @@ public static class Core
         }
         id.Why = checkedZips == 0 ? "the fork has no Windows releases to compare with"
                : noRange == checkedZips ? "the host doesn't allow partial downloads, so the version can't be checked"
-               : "not one of the fork's last " + checkedZips + " Windows releases (an older or self-built copy)";
+               : "not one of the fork's last " + checkedRels + " Windows releases (an older or self-built copy)";
         return id;
     }
 
@@ -836,6 +932,7 @@ public static class Core
             if (!File.Exists(file)) return l;
             object[] list = Json.DeserializeObject(File.ReadAllText(file)) as object[];
             if (list == null) return l;
+            LinkedFiles(list, e.Host, e.ApiBase, e.Repo);
             List<Release> chan = Matching(e, list, true);
             if ((chan == null || chan.Count == 0) && !string.IsNullOrEmpty(e.TagPrefix)) chan = Matching(e, list, false);
             IEnumerable<string> when = chan != null && chan.Count > 0 ? chan.Select(r => r.Published)
@@ -877,6 +974,7 @@ public static class Core
         }
         object[] list = Json.DeserializeObject(text) as object[];
         if (list == null) throw new Exception("Unexpected answer from " + url);
+        LinkedFiles(list, host, apiBase, repo);
         return list;
     }
 
@@ -1142,6 +1240,31 @@ public static class Core
 
     public static string Download(EmuDef e, Release r, Action<string> log, Action<long, long> progress, CancellationToken ct)
     {
+        if (r.Linked && r.Size <= 0)
+        {   // the file is linked from the release's notes: its size comes from its server, so the download can be checked
+            long total = -1;
+            for (int t = 0; ; t++)
+            {
+                ct.ThrowIfCancellationRequested();
+                try { total = LinkedSize(r.AssetUrl); break; }
+                catch (Exception ex)
+                {
+                    if (ex is OperationCanceledException) throw;
+                    WebException we = ex as WebException;
+                    HttpWebResponse hr = we != null ? we.Response as HttpWebResponse : null;
+                    if (hr != null && (hr.StatusCode == HttpStatusCode.NotFound || hr.StatusCode == HttpStatusCode.Gone))
+                        throw new Exception("The file for " + r.Tag + " isn't on its download server (it may not be uploaded yet, or it was removed).");
+                    bool server = Retryable(ex);
+                    log("Checking the file's size failed: " + ex.Message);
+                    if (!server || t >= 2) throw new Exception(server ? "The download server isn't responding right now (" + ex.Message + ")." : ex.Message);
+                    progress(SLOW, 0);
+                    Thread.Sleep(2000 * (t + 1));
+                }
+            }
+            if (total <= 0) throw new Exception("The download link in " + r.Tag + "'s notes doesn't say how big the file is, so it wasn't downloaded.");
+            r.Size = total;
+            log("No file is attached to release " + r.Tag + "; using the link in its notes: " + r.AssetUrl + " (" + Mb(r.Size) + ").");
+        }
         string dir = Path.Combine(DownloadsDir(e), Safe(r.Tag));
         Directory.CreateDirectory(dir);
         string dst = Path.Combine(dir, Safe(Path.GetFileName(r.Asset ?? "")).Length > 0 ? Safe(Path.GetFileName(r.Asset)) : "release.zip");   // the host's name, never a path
@@ -1187,6 +1310,34 @@ public static class Core
         return dst;
     }
 
+    // The size of a file behind a link (a 1-byte range request; redirects are followed by hand and must stay on https).
+    // -1 when the server doesn't say.
+    static long LinkedSize(string url)
+    {
+        for (int hop = 0; hop < 6; hop++)
+        {
+            if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return -1;
+            HttpWebRequest q = Req(url); q.Accept = "application/octet-stream"; q.AllowAutoRedirect = false; q.AddRange(0L, 0L);
+            using (HttpWebResponse w = (HttpWebResponse)q.GetResponse())
+            {
+                int code = (int)w.StatusCode;
+                if (code >= 300 && code < 400)
+                {
+                    string loc = w.Headers["Location"];
+                    if (string.IsNullOrEmpty(loc)) return -1;
+                    url = new Uri(new Uri(url), loc).ToString(); continue;
+                }
+                if (w.StatusCode == HttpStatusCode.PartialContent)
+                {
+                    string cr = w.Headers["Content-Range"] ?? ""; int slash = cr.LastIndexOf('/'); long total;
+                    if (slash >= 0 && long.TryParse(cr.Substring(slash + 1), out total) && total > 0) return total;
+                }
+                return code == 200 && w.ContentLength > 0 ? w.ContentLength : -1;
+            }
+        }
+        return -1;
+    }
+
     // A server-side or network failure worth another try (not a 404 or a full disk).
     static bool Retryable(Exception ex)
     {
@@ -1216,6 +1367,7 @@ public static class Core
             }
             catch (WebException) { throw; }
             catch { final = null; }
+            if (final != null && r.Linked && !final.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) throw new Exception("The download link moved to a page without https, so it wasn't downloaded.");
             if (final != null) { FetchPieces(final, part, r.Size, progress, ct); return; }
         }
         FetchWhole(url, part, r, progress, ct);
@@ -1282,6 +1434,8 @@ public static class Core
         HttpWebRequest q = Req(url); q.Accept = "application/octet-stream";
         long got = 0;
         using (WebResponse w = q.GetResponse())
+        {
+        if (r.Linked && !w.ResponseUri.AbsoluteUri.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) throw new Exception("The download link moved to a page without https, so it wasn't downloaded.");
         using (Stream s = w.GetResponseStream())
         using (FileStream f = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20))
         {
@@ -1294,6 +1448,7 @@ public static class Core
                 if ((DateTime.Now - last).TotalMilliseconds > 150) { progress(got, total); last = DateTime.Now; }
             }
             progress(got, total);
+        }
         }
         // the connection closed before the whole file came: worth another try
         if (r.Size > 0 && got < r.Size) throw new IOException("The connection closed early (" + got + " of " + r.Size + " bytes).");

@@ -31,9 +31,23 @@ public static class UserData
     };
     public static Item Find(string key) { return Items.FirstOrDefault(i => string.Equals(i.Key, key, StringComparison.OrdinalIgnoreCase)); }
 
+    // Two sharing groups: Switch 2 emulators share "Shared data", Switch 1 emulators (Eden...) "Shared data (Switch 1)".
+    // Each group has its own ticked emulator, its own backups (Set aside) and its own "go back" records; an emulator
+    // only ever joins its own group's folder.
     public const string SHARED = "Shared data";
+    public const string SHARED1 = "Shared data (Switch 1)";
     public const string SET_ASIDE = "Set aside";
-    public static string SharedRoot { get { return Path.Combine(Core.Home, SHARED); } }
+    public static string SharedRoot { get { return RootFor(2); } }   // the Switch 2 group's (as before)
+    public static int GroupOf(EmuDef e) { return Core.SwitchOf(e) == 1 ? 1 : 2; }
+    public static string RootFor(int g) { return Path.Combine(Core.Home, g == 1 ? SHARED1 : SHARED); }
+    public static string RootOf(EmuDef e) { return RootFor(GroupOf(e)); }
+    public static readonly int[] Groups = { 2, 1 };
+    // the group's ticked emulator (its id) and what new emulators of the group share from the start
+    public static string HostId(int g) { return g == 1 ? Core.Cfg.Share1Host : Core.Cfg.ShareHost; }
+    public static void SetHost(int g, string id) { if (g == 1) Core.Cfg.Share1Host = id; else Core.Cfg.ShareHost = id; }
+    public static List<string> NewOf(int g) { return g == 1 ? Core.Cfg.Share1New : Core.Cfg.ShareNew; }
+    public static void SetNew(int g, List<string> keys) { if (g == 1) Core.Cfg.Share1New = keys; else Core.Cfg.ShareNew = keys; }
+    public static string GroupName(int g) { return "Switch " + g; }
     public static string RemovedRoot { get { return Path.Combine(Core.Home, Core.REMOVED); } }
 
     // ---- can this drive share? Sharing links folders (NTFS junctions); FAT32 / exFAT drives (most USB sticks) can't.
@@ -61,10 +75,6 @@ public static class UserData
             return ok;
         }
     }
-    // Shared data is for Switch 2 emulators: a Switch 1 emulator (Eden...) needs its own firmware, and Switch 2 system
-    // saves are no use to it. It never joins (one that joined in an older version stays until sharing stops).
-    public static bool CanJoin(EmuDef e) { return Core.SwitchOf(e) != 1; }
-    public const string SWITCH1_OWN = "Switch 1 emulators keep their own keys, firmware and saves. Shared data is for Switch 2 emulators.";
     public const string NO_SHARE = "This drive can't share saves between emulators (most USB sticks can't). Each emulator keeps its own.";
 
     // A shared-data link that points into "...\Shared data\<item>" somewhere other than this folder's Shared data (the
@@ -72,6 +82,11 @@ public static class UserData
     // link changes, never any data. Done at start, before anything launches or joins sharing.
     public static void RepairLinks(string oldHome, Action<string> log)
     {
+        foreach (string name in new[] { SHARED, SHARED1 }) RepairLinks(oldHome, name, log);
+    }
+    static void RepairLinks(string oldHome, string SHARED, Action<string> log)
+    {
+        string SharedRoot = Path.Combine(Core.Home, SHARED);
         if (Core.Cfg == null || !Directory.Exists(SharedRoot)) return;
         string mine = Full(SharedRoot);
         string oldShared = Full(Path.Combine(oldHome, SHARED)) + "\\";
@@ -194,7 +209,9 @@ public static class UserData
     // ---- shared data
     public enum State { Off, On, Other }   // Other: linked somewhere else by hand, or only partly shared
 
-    public static State StateOf(EmuDef e, Item it)
+    public static State StateOf(EmuDef e, Item it) { return StateIn(e, it, RootOf(e)); }
+    // against a given shared folder (stopping a group also takes an emulator an older version linked into it)
+    public static State StateIn(EmuDef e, Item it, string SharedRoot)
     {
         if (!IsPortable(e)) return State.Off;
         int on = 0, other = 0;
@@ -239,7 +256,8 @@ public static class UserData
         try { return Full(b); } catch { return b; }
     }
     // Some path of the item is a link that doesn't point into the shared folder (made by hand): left alone.
-    public static bool LinkedElsewhere(EmuDef e, Item it)
+    public static bool LinkedElsewhere(EmuDef e, Item it) { return LinkedElsewhereIn(e, it, RootOf(e)); }
+    static bool LinkedElsewhereIn(EmuDef e, Item it, string SharedRoot)
     {
         if (!IsPortable(e)) return false;
         foreach (string rel in it.Paths)
@@ -256,6 +274,7 @@ public static class UserData
     {
         Dictionary<string, string> d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (!IsPortable(e)) return d;
+        string SharedRoot = RootOf(e);
         foreach (Item it in HostItems)
             foreach (string rel in it.Paths)
             {
@@ -271,6 +290,7 @@ public static class UserData
     public static bool OddLinks(EmuDef e)
     {
         if (!IsPortable(e)) return false;
+        string SharedRoot = RootOf(e);
         Dictionary<string, string> f = ForeignLinks(e);
         foreach (Item it in HostItems)
             foreach (string rel in it.Paths)
@@ -287,8 +307,12 @@ public static class UserData
     {
         string t = ForeignLinks(e).Values.FirstOrDefault();
         if (t == null) return null;
-        int i = t.IndexOf("\\" + SHARED + "\\", StringComparison.OrdinalIgnoreCase);
-        return i >= 0 ? t.Substring(0, i + SHARED.Length + 1) : t;
+        foreach (string sh in new[] { SHARED1, SHARED })
+        {
+            int i = t.IndexOf("\\" + sh + "\\", StringComparison.OrdinalIgnoreCase);
+            if (i >= 0) return t.Substring(0, i + sh.Length + 1);
+        }
+        return t;
     }
 
     // Replaces e's foreign links with a copy of what they point to, so the data becomes e's own. The copy is made and
@@ -297,6 +321,7 @@ public static class UserData
     {
         Dictionary<string, string> f = ForeignLinks(e);
         if (f.Count == 0) return;
+        bool otherGroup = LinkedIntoGroup(e, 3 - GroupOf(e));   // an older version linked it into the other Switch's data
         CheckFolders(e);
         if (Core.Running(e).Count > 0) throw new Exception("Close " + e.Name + " first.");
         long need = 0;
@@ -322,6 +347,7 @@ public static class UserData
             catch { try { CreateJunction(b, t); DeleteTree(tmp); } catch { } throw; }
             log(e.Name + ": " + b.Substring(UserDir(e).Length + 1) + " copied in from " + t + " (that folder isn't changed).");
         }
+        if (otherGroup) Forget(e);   // its records were for that sharing
     }
 
     // e and x use the same folder for some path of the item (shared now, partly shared, an old shared folder or a
@@ -345,7 +371,7 @@ public static class UserData
         {
             if (JunctionTarget(probe) != null) RemoveDirectory(probe);
             else if (Directory.Exists(probe)) DeleteEmptyTree(probe);
-            CreateJunction(probe, SharedRoot);
+            CreateJunction(probe, RootOf(e));
         }
         catch (Exception ex) { throw new Exception("Sharing doesn't work on the drive " + e.Name + " is on. (" + ex.Message + ")"); }
         finally { try { if (JunctionTarget(probe) != null) RemoveDirectory(probe); } catch { } }
@@ -361,7 +387,7 @@ public static class UserData
     {
         CheckFolders(e);
         BlockIfRunning(e, othersMayRun ? null : it);
-        string user = UserDir(e);
+        string user = UserDir(e), SharedRoot = RootOf(e);
         // decide everything first, so nothing changes when one part is in conflict or can't be done
         foreach (string rel in it.Paths)
         {
@@ -391,14 +417,14 @@ public static class UserData
                     bool same = SameTree(b, s);
                     if (same || prefer != "build")
                     {
-                        if (asideB == null) asideB = NewAside(e.Name + " - " + it.Label); movedB = SetAside(b, asideB, rel, log);
+                        if (asideB == null) asideB = NewAside(e.Name + " - " + it.Label, SharedRoot); movedB = SetAside(b, asideB, rel, log);
                         // firmware isn't kept; keys identical to the shared ones aren't either, nor the ticked one's saves when
                         // they're the same as the shared ones (it keeps the latest anyway)
                         if (it.Key == "firmware" || (it.Key == "keys" && same) || (it.Key == "saves" && same && prefer == "build")) recycle.Add(movedB);
                     }
                     else
                     {
-                        if (asideS == null) asideS = NewAside("Shared - " + it.Label);
+                        if (asideS == null) asideS = NewAside("Shared - " + it.Label, SharedRoot);
                         movedS = SetAside(s, asideS, rel, log);
                         MoveTree(b, s, log); bToS = true;
                         if (it.Key == "firmware") recycle.Add(movedS);
@@ -471,13 +497,21 @@ public static class UserData
     public static List<KeyValuePair<string, long>> DuplicateBackups()
     {
         List<KeyValuePair<string, long>> drop = new List<KeyValuePair<string, long>>();
+        foreach (int g in Groups) drop.AddRange(DuplicateBackups(g));
+        return drop;
+    }
+    static List<KeyValuePair<string, long>> DuplicateBackups(int g)
+    {
+        string SharedRoot = RootFor(g);
+        List<KeyValuePair<string, long>> drop = new List<KeyValuePair<string, long>>();
         string root = Path.Combine(SharedRoot, SET_ASIDE);
         if (!Directory.Exists(root)) return drop;
         HashSet<string> needed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (Core.Cfg.ShareBackups != null) foreach (List<string> l in Core.Cfg.ShareBackups.Values) foreach (string p in l) needed.Add(Full(p));
         string fwRel = @"nand\system\Contents";
-        bool fwInUse = HasFiles(Path.Combine(SharedRoot, fwRel)) || Core.Cfg.Emulators.Any(e => IsPortable(e) && HasFiles(Path.Combine(UserDir(e), fwRel)));
-        List<string> inUseKeys = new[] { Path.Combine(SharedRoot, "keys") }.Concat(Core.Cfg.Emulators.Where(IsPortable).Select(e => Path.Combine(UserDir(e), "keys"))).Where(HasFiles).ToList();
+        // firmware and keys in use by this group (a Switch 1 backup isn't replaced by Switch 2 firmware)
+        bool fwInUse = HasFiles(Path.Combine(SharedRoot, fwRel)) || Core.Cfg.Emulators.Any(e => GroupOf(e) == g && IsPortable(e) && HasFiles(Path.Combine(UserDir(e), fwRel)));
+        List<string> inUseKeys = new[] { Path.Combine(SharedRoot, "keys") }.Concat(Core.Cfg.Emulators.Where(e => GroupOf(e) == g && IsPortable(e)).Select(e => Path.Combine(UserDir(e), "keys"))).Where(HasFiles).ToList();
         List<string> keptKeys = new List<string>(), keptSaves = new List<string>();
         // newest first, so the newest copy of something is the one kept
         foreach (string d in Directory.GetDirectories(root).OrderByDescending(Directory.GetCreationTime))
@@ -523,7 +557,8 @@ public static class UserData
 
     // Stops sharing one item: the build gets its own copy of the shared data (the shared folder keeps it for the other
     // builds). The copy is made and checked while the link is still there; only then is the link swapped for it.
-    public static void Unshare(EmuDef e, Item it, Action<string> log)
+    public static void Unshare(EmuDef e, Item it, Action<string> log) { UnshareIn(e, it, RootOf(e), log); }
+    static void UnshareIn(EmuDef e, Item it, string SharedRoot, Action<string> log)
     {
         CheckFolders(e);
         BlockIfRunning(e, it);
@@ -573,8 +608,9 @@ public static class UserData
     public static List<string> ShareForNewBuild(EmuDef e, Action<string> log)
     {
         List<string> failed = new List<string>();
-        if (Core.Cfg.ShareNew == null || !CanJoin(e)) return failed;
-        foreach (string k in Core.Cfg.ShareNew)
+        List<string> keys = NewOf(GroupOf(e));
+        if (keys == null) return failed;
+        foreach (string k in keys)
         {
             Item it = Find(k);
             if (it == null) continue;
@@ -609,8 +645,10 @@ public static class UserData
     }
 
     // When e's copy of the item (null: the shared one) was last changed, for "newest first".
-    public static DateTime LastChanged(Item it, EmuDef e)
+    public static DateTime LastChanged(Item it, EmuDef e) { return LastChanged(it, e, 2); }
+    public static DateTime LastChanged(Item it, EmuDef e, int g)   // e null: the group's shared copy
     {
+        string SharedRoot = RootFor(g);
         DateTime t = DateTime.MinValue;
         string[] rels = it.Key == "saves" ? new[] { @"nand\user\save", @"nand\system\save" } : it.Paths;   // game saves, not updates/DLC
         foreach (string rel in rels)
@@ -622,7 +660,8 @@ public static class UserData
         return t;
     }
 
-    public static bool SharedHasData(Item it) { return it.Paths.Any(rel => HasFiles(Path.Combine(SharedRoot, rel))); }
+    public static bool SharedHasData(Item it) { return SharedHasData(it, 2); }
+    public static bool SharedHasData(Item it, int g) { return it.Paths.Any(rel => HasFiles(Path.Combine(RootFor(g), rel))); }
 
     // Why build k can't take part in sharing right now (plain words), or null.
     public static string SharingProblem(EmuDef k)
@@ -644,7 +683,7 @@ public static class UserData
         return "it didn't work (see the log)";
     }
 
-    // "Share data with other emulators" ticked on host. For keys, firmware and saves, everyone ends up on one shared copy:
+    // "Share data with other Switch N emulators" ticked on host (its own group). For keys, firmware and saves, everyone ends up on one shared copy:
     //  - host's own copy; or, when host already uses the shared folder, the shared copy (the latest progress);
     //  - when host has neither, the copy changed last (another build's, or what the shared folder holds).
     // Every other build then joins (JoinOne). Builds that can't join now are left out and listed ("Name: why").
@@ -653,6 +692,8 @@ public static class UserData
     {
         string hp = SharingProblem(host);
         if (hp != null) throw new Exception(host.Name + ": " + hp + ".");
+        int g = GroupOf(host);
+        all = all.Where(k => GroupOf(k) == g).ToList();   // Switch 1 shares with Switch 1, Switch 2 with Switch 2
         BringHome(host, log);   // data linked to another (older) shared folder becomes its own first
         Dictionary<EmuDef, string> skip = new Dictionary<EmuDef, string>();
         foreach (EmuDef k in all) if (k != host) { string p = SharingProblem(k); if (p != null) skip[k] = p; }
@@ -662,7 +703,7 @@ public static class UserData
             if (OwnData(host, it)) k0 = host;
             else if (StateOf(host, it) == State.Off)
             {   // host has none of it: the newest copy among the others and the shared folder
-                DateTime best = SharedHasData(it) ? LastChanged(it, null) : DateTime.MinValue;
+                DateTime best = SharedHasData(it, g) ? LastChanged(it, null, g) : DateTime.MinValue;
                 foreach (EmuDef k in all)
                     if (k != host && !skip.ContainsKey(k) && OwnData(k, it)) { DateTime t = LastChanged(it, k); if (t > best) { best = t; k0 = k; } }
             }
@@ -727,7 +768,7 @@ public static class UserData
             if (!Core.Cfg.ShareBackups.ContainsKey(k.Id)) Core.Cfg.ShareBackups[k.Id] = new List<string>();
             if (!Core.Cfg.ShareMerged.ContainsKey(k.Id)) Core.Cfg.ShareMerged[k.Id] = new List<string>();
             if (aside != null) Core.Cfg.ShareBackups[k.Id].Add(aside);
-            string u = UserDir(k);
+            string u = UserDir(k), SharedRoot = RootOf(k);
             foreach (KeyValuePair<string, string> m in moved)
                 if (m.Key.StartsWith(u + "\\", StringComparison.OrdinalIgnoreCase) && m.Value.StartsWith(SharedRoot + "\\", StringComparison.OrdinalIgnoreCase))
                     Core.Cfg.ShareMerged[k.Id].Add(m.Key.Substring(u.Length + 1) + "|" + m.Value.Substring(SharedRoot.Length + 1));
@@ -753,8 +794,8 @@ public static class UserData
     {
         List<KeyValuePair<string, string>> moved = new List<KeyValuePair<string, string>>();
         Item saves = Find("saves");
-        string bUser = Path.Combine(UserDir(k), @"nand\user"), sUser = Path.Combine(SharedRoot, @"nand\user");
-        if (JunctionTarget(bUser) != null || !HasFiles(bUser) || !SharedHasData(saves)) return moved;   // nothing to add, or nothing shared yet
+        string bUser = Path.Combine(UserDir(k), @"nand\user"), sUser = Path.Combine(RootOf(k), @"nand\user");
+        if (JunctionTarget(bUser) != null || !HasFiles(bUser) || !SharedHasData(saves, GroupOf(k))) return moved;   // nothing to add, or nothing shared yet
         if (FindReparse(bUser) != null || FindReparse(sUser) != null) return moved;
         BlockIfRunning(k, saves);
         string b = Path.Combine(bUser, @"save\0000000000000000"), s = Path.Combine(sUser, @"save\0000000000000000");
@@ -812,28 +853,81 @@ public static class UserData
     // the latest too. goBack true: the others get their own saves from before sharing back (their Set aside copy, plus
     // what they added to the shared saves, as it is now); their keys and firmware stay the latest. The Set aside
     // copies stay where they are.
-    public static void StopSharing(EmuDef host, List<EmuDef> all, bool goBack, Action<string> log)
+    // g: the group whose folder stops being shared; all: the emulators to look at (any linked into that folder, even one
+    // of the other Switch that an older version joined, gets its own copy). Only their "go back" records are cleared.
+    public static void StopSharing(int g, EmuDef host, List<EmuDef> all, bool goBack, Action<string> log)
     {
+        string root = RootFor(g);
         foreach (EmuDef k in all)
             foreach (Item it in Items)
             {
-                if (StateOf(k, it) == State.Off || LinkedElsewhere(k, it)) continue;
-                if (goBack && k != host && it.Key == "saves" && CanGoBack(k)) RestoreOwnSaves(k, log);
-                else Unshare(k, it, log);
+                if (StateIn(k, it, root) == State.Off || LinkedElsewhereIn(k, it, root)) continue;
+                if (goBack && k != host && it.Key == "saves" && CanGoBack(k)) RestoreOwnSaves(k, root, log);
+                else UnshareIn(k, it, root, log);
             }
-        lock (Core.Cfg) { Core.Cfg.ShareBackups = null; Core.Cfg.ShareMerged = null; }
+        // the records of this sharing go: the emulators looked at (unless one is still in the other Switch's sharing), the
+        // group's emulators that weren't (not installed now), and ones of emulators no longer on the list
+        int other = 3 - g;
+        HashSet<string> drop = new HashSet<string>(all.Where(k => !LinkedIntoGroup(k, other)).Select(k => k.Id));
+        foreach (EmuDef x in Core.Cfg.Emulators) if (GroupOf(x) == g && !all.Contains(x) && !LinkedIntoGroup(x, other)) drop.Add(x.Id);
+        lock (Core.Cfg)
+        {
+            foreach (Dictionary<string, List<string>> d in new[] { Core.Cfg.ShareBackups, Core.Cfg.ShareMerged })
+                if (d != null)
+                    foreach (string id in d.Keys.ToList())
+                        if (drop.Contains(id) || !Core.Cfg.Emulators.Any(x => x.Id == id)) d.Remove(id);
+            if (Core.Cfg.ShareBackups != null && Core.Cfg.ShareBackups.Count == 0) Core.Cfg.ShareBackups = null;
+            if (Core.Cfg.ShareMerged != null && Core.Cfg.ShareMerged.Count == 0) Core.Cfg.ShareMerged = null;
+        }
     }
-    public static void StopSharing(List<EmuDef> all, Action<string> log) { StopSharing(null, all, false, log); }
+    // k left a group's shared data without the group stopping (it changed Switch, or links an older version made into
+    // the other group's folder were replaced by its own copy): its "go back" records belong to that sharing and go, so a
+    // later sharing of the other group starts afresh. Its old saves stay in Set aside; nothing is deleted.
+    public static void Forget(EmuDef k)
+    {
+        lock (Core.Cfg)
+        {
+            if (Core.Cfg.ShareBackups != null) { Core.Cfg.ShareBackups.Remove(k.Id); if (Core.Cfg.ShareBackups.Count == 0) Core.Cfg.ShareBackups = null; }
+            if (Core.Cfg.ShareMerged != null) { Core.Cfg.ShareMerged.Remove(k.Id); if (Core.Cfg.ShareMerged.Count == 0) Core.Cfg.ShareMerged = null; }
+        }
+    }
+
+    // The emulators to look at when group g stops: its own, and any other linked into its folder.
+    public static List<EmuDef> InGroup(int g, IEnumerable<EmuDef> defs)
+    {
+        return defs.Where(k => IsPortable(k) && (GroupOf(k) == g || LinkedIntoGroup(k, g))).ToList();
+    }
+    // Some folder of e's data is a link into group g's shared folder (not just any link: one into the other group's
+    // folder doesn't count).
+    public static bool LinkedIntoGroup(EmuDef e, int g)
+    {
+        if (!IsPortable(e)) return false;
+        string r = Full(RootFor(g)) + "\\";
+        foreach (Item it in Items)
+            foreach (string rel in it.Paths)
+            {
+                string t = JunctionTarget(Path.Combine(UserDir(e), rel));
+                if (t != null && !t.StartsWith("(") && (Full(t) + "\\").StartsWith(r, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+        return false;
+    }
+    // A stop of group g that didn't finish: "go back" records are left for its emulators.
+    public static bool Stopping(int g)
+    {
+        Func<Dictionary<string, List<string>>, bool> has = d => d != null && d.Keys.Any(id => Core.Cfg.Emulators.Any(x => x.Id == id && GroupOf(x) == g));
+        return has(Core.Cfg.ShareBackups) || has(Core.Cfg.ShareMerged);
+    }
 
     // Why sharing can't be stopped right now (plain words), or null: an emulator is open, or there's no room for the
     // copies every emulator gets.
-    public static string StopProblem(List<EmuDef> all)
+    public static string StopProblem(int g, List<EmuDef> all)
     {
+        string SharedRoot = RootFor(g);
         List<string> open = all.Where(k => Core.Running(k).Count > 0).Select(k => k.Name).ToList();
         if (open.Count > 0) return "Close " + string.Join(" and ", open) + " first.";
         long one = 0;
         foreach (Item it in HostItems) foreach (string rel in it.Paths) { string d = Path.Combine(SharedRoot, rel); if (Directory.Exists(d)) one += Count(d)[1]; }
-        long need = one * all.Count(k => HostItems.Any(i => StateOf(k, i) != State.Off));
+        long need = one * all.Count(k => LinkedIntoGroup(k, g));
         try
         {
             DriveInfo di = new DriveInfo(Path.GetPathRoot(Full(SharedRoot)));
@@ -844,7 +938,7 @@ public static class UserData
     }
 
     // k's saves as they were before it joined: built next to its links, checked, then swapped in for them.
-    static void RestoreOwnSaves(EmuDef k, Action<string> log)
+    static void RestoreOwnSaves(EmuDef k, string SharedRoot, Action<string> log)
     {
         Item saves = Find("saves");
         CheckFolders(k);
@@ -883,7 +977,7 @@ public static class UserData
                 string b = Path.Combine(u, rel);
                 string target = JunctionTarget(b);
                 if (target != null) RemoveJunction(b);
-                else if (Directory.Exists(b)) { string aside = NewAside(k.Name + " - before going back"); SetAside(b, aside, rel, log); }
+                else if (Directory.Exists(b)) { string aside = NewAside(k.Name + " - before going back", SharedRoot); SetAside(b, aside, rel, log); }
                 try { Directory.Move(tmp[rel], b); }
                 catch { try { if (target != null && !Directory.Exists(b)) CreateJunction(b, target); } catch { } throw; }
                 swapped.Add(new KeyValuePair<string, string>(rel, target));
@@ -924,8 +1018,9 @@ public static class UserData
         }
         string nu = Path.Combine(UserDir(e), @"nand\user"), t = JunctionTarget(nu);
         if (t == null) { kind = SaveKind.Own; return Path.Combine(nu, "save"); }
-        if (t != "(another kind of link)" && string.Equals(Full(t), Full(Path.Combine(SharedRoot, @"nand\user")), StringComparison.OrdinalIgnoreCase))
-        { kind = SaveKind.Shared; return Path.Combine(SharedRoot, @"nand\user\save"); }
+        foreach (int g in new[] { GroupOf(e), 3 - GroupOf(e) })
+            if (t != "(another kind of link)" && string.Equals(Full(t), Full(Path.Combine(RootFor(g), @"nand\user")), StringComparison.OrdinalIgnoreCase))
+            { kind = SaveKind.Shared; return Path.Combine(RootFor(g), @"nand\user\save"); }
         kind = SaveKind.OtherFolder; return t == "(another kind of link)" ? Path.Combine(nu, "save") : Path.Combine(t, "save");
     }
 
@@ -951,8 +1046,10 @@ public static class UserData
     public static List<Tuple<string, string, DateTime>> SavedAside()
     {
         List<Tuple<string, string, DateTime>> l = new List<Tuple<string, string, DateTime>>();
-        string root = Path.Combine(SharedRoot, SET_ASIDE);
-        if (!Directory.Exists(root)) return l;
+        foreach (int g in Groups)
+        {
+        string root = Path.Combine(RootFor(g), SET_ASIDE);
+        if (!Directory.Exists(root)) continue;
         foreach (string d in Directory.GetDirectories(root))
         {
             string saves = Path.Combine(d, @"nand\user\save");
@@ -960,8 +1057,9 @@ public static class UserData
             string name = Path.GetFileName(d), who = name;
             int i = name.IndexOf(" - ", StringComparison.Ordinal);
             if (i > 0) who = name.Substring(0, i);
-            if (who == "Shared") who = "The shared saves";
+            if (who == "Shared") who = g == 1 ? "The shared Switch 1 saves" : "The shared saves";
             l.Add(Tuple.Create(who, saves, Directory.GetCreationTime(d)));
+        }
         }
         return l.OrderByDescending(x => x.Item3).ToList();
     }
@@ -997,6 +1095,7 @@ public static class UserData
     public static List<EmuDef> DistinctHolders(Item it, List<EmuDef> holders)
     {
         List<EmuDef> o = new List<EmuDef>();
+        string SharedRoot = holders.Count > 0 ? RootOf(holders[0]) : RootFor(2);
         foreach (EmuDef h in holders)
         {
             if (SameAll(it, Path.Combine(UserDir(h), "{0}"), Path.Combine(SharedRoot, "{0}"))) continue;
@@ -1034,7 +1133,7 @@ public static class UserData
         if (string.IsNullOrEmpty(e.Dir) || !IsPortable(e)) throw new Exception(e.Name + " doesn't keep its own data yet.");
         string bad = Core.FolderProblem(e, e.Dir);
         if (bad != null) throw new Exception(bad);
-        Directory.CreateDirectory(SharedRoot);
+        Directory.CreateDirectory(RootOf(e));
     }
 
     // e itself, and when an item is given every other build using the same data for it, must be closed.
@@ -1150,7 +1249,7 @@ public static class UserData
     }
 
     // A new folder under "Shared data\Set aside" for one item's replaced copy ("<label> <date>", made unique).
-    static string NewAside(string label)
+    static string NewAside(string label, string SharedRoot)   // in that group's shared folder
     {
         string root = Path.Combine(SharedRoot, SET_ASIDE);
         string name = Core_Safe(label + " " + DateTime.Now.ToString("yyyy-MM-dd HHmm"));

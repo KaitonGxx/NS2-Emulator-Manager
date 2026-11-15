@@ -31,8 +31,9 @@ Made by **Riskbreak** (Discord).
 - **Everything stays in the manager's folder:** each emulator it installs keeps its saves in its own folder, and the
   manager's own files are in `.manager-data`. The manager puts nothing in AppData. (An emulator you already had may still
   use AppData until you choose **Keep its saves in its own folder** in its "..." menu.)
-- **Share data with other emulators:** tick it on one Switch 2 emulator and the others use its keys, firmware and saves,
-  so your progress follows you. Saves for different games are combined, and nothing is deleted. When you stop, choose
+- **Share data with other emulators:** tick "Share data with other Switch 2 emulators" on one and the other Switch 2
+  emulators use its keys, firmware and saves, so your progress follows you. Switch 1 emulators share with each other the
+  same way. Saves for different games are combined, and no saves are lost (extra copies of firmware go to the Recycle Bin). When you stop, choose
   whether the others keep the latest saves or restore their own. (Not on FAT32 or exFAT drives, like most USB sticks:
   there each emulator keeps its own.)
 - **Save Helper** shows where every emulator's saves are, the backups, and how to back them up.
@@ -45,9 +46,11 @@ Made by **Riskbreak** (Discord).
 
 **🕹️ Switch 1 emulators too**
 - Add Eden and other Switch 1 emulators like it (Citron, Sudachi...) from a link. Choose a **Switch 1 games folder** on
-  the Games folder tile: they show only those games and skip your Switch 2 games, so their game list opens faster.
-- They keep their own keys, firmware and saves (shared data is for Switch 2 emulators). Set to the wrong Switch? Change
-  it with **Switch 1 or Switch 2...** in the card's "..." menu.
+  the Games folders tile: they show only those games and skip your Switch 2 games, so their game list opens faster.
+- They can share keys, firmware and saves with each other: tick "Share data with other Switch 1 emulators" on one.
+  They never share with your Switch 2 emulators.
+- Set to the wrong Switch? Change it with **Switch 1 or Switch 2...** in the card's "..." menu. If it shares data, it
+  gets its own copy first; if it's the ticked one, untick it first.
 
 **🎒 Portable if you want it**
 - A **no-install version** that keeps everything in one folder, for a USB stick, a games drive or a backup you can

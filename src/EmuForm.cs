@@ -1178,13 +1178,32 @@ class EmuForm : Form
         if (r != 0 && r != 1) return;
         int sw = r == 0 ? cur : 3 - cur;
         if (sw == cur && c.Def.SwitchVersion == sw) return;
-        c.Def.SwitchVersion = sw;
-        try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save: " + ex.Message); }
-        Log(c.Def.Name + " is now a Switch " + sw + " emulator.");
-        GamesText(); DoLayout();
-        SyncGames(null, 0, false, c.Def);
-        if (sw == 1 && string.IsNullOrEmpty(Core.Cfg.Games1Folder))
-            SetFooter("Choose your Switch 1 games folder in the Games folders tile.", Theme.Info);
+        MethodInvoker apply = delegate
+        {
+            c.Def.SwitchVersion = sw;
+            try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save: " + ex.Message); }
+            Log(c.Def.Name + " is now a Switch " + sw + " emulator.");
+            GamesText(); DoLayout();
+            SyncGames(null, 0, false, c.Def);
+            if (sw == 1 && string.IsNullOrEmpty(Core.Cfg.Games1Folder))
+                SetFooter("Choose your Switch 1 games folder in the Games folders tile.", Theme.Info);
+            RefreshAll();
+            JoinSharing(c);   // the other group's sharing, if it has one
+        };
+        if (sw == cur) { apply(); return; }
+        // sharing is per Switch: it leaves its group's shared data first (keeping its own copy of it)
+        int g = UserData.GroupOf(c.Def);
+        if (UserData.HostId(g) == c.Def.Id)
+        {
+            Tell("Switch 1 or Switch 2?", "Your other Switch " + g + " emulators use " + c.Def.Name + "'s data. Turn off \"Share data with other Switch " + g + " emulators\" on it first.");
+            return;
+        }
+        List<UserData.Item> sharedItems = UserData.Items.Where(i => UserData.StateOf(c.Def, i) != UserData.State.Off && !UserData.LinkedElsewhere(c.Def, i)).ToList();
+        if (sharedItems.Count == 0) { apply(); return; }
+        if (IsBusy) { PleaseWait(); return; }
+        if (Core.Running(c.Def).Count > 0) { Tell("Switch 1 or Switch 2?", "Close " + c.Def.Name + " first."); return; }
+        if (Ask("Switch 1 or Switch 2?", c.Def.Name + " uses the shared Switch " + g + " data. It gets its own copy of it first, then it's set as a Switch " + sw + " emulator.", "Continue", "Cancel") != 0) return;
+        Work(c, "Leaving shared data", (log, prog) => { foreach (UserData.Item it in sharedItems) UserData.Unshare(c.Def, it, log); UserData.Forget(c.Def); }, apply);
     }
 
     // Release notes as plain text: markdown links -> their text, no tables, headings or code ticks, and the sections
@@ -1890,14 +1909,18 @@ class EmuForm : Form
         heading("Your saves right now");
         List<EmuCard> inst = cards.Where(k => Installed(k.Def)).ToList();
         if (inst.Count == 0) text("No emulators yet.", null, Theme.Muted);
-        EmuDef hostDef = Core.Cfg.ShareHost == null ? null : Core.Cfg.Emulators.FirstOrDefault(e => e.Id == Core.Cfg.ShareHost);
         bool anyShared = false;
         foreach (EmuCard k in inst)
         {
             UserData.SaveKind kind; string where = UserData.SavesOf(k.Def, out kind);
             int n = UserData.CountGames(where);
             string note;
-            if (kind == UserData.SaveKind.Shared) { anyShared = true; note = (hostDef == k.Def ? "Shares its saves with your other emulators" : "Uses the shared saves") + " (" + games(n) + ")."; }
+            if (kind == UserData.SaveKind.Shared)
+            {
+                anyShared = true;
+                int g = where.StartsWith(UserData.RootFor(1) + "\\", StringComparison.OrdinalIgnoreCase) ? 1 : 2;   // whose shared folder it uses
+                note = (HostDef(g) == k.Def ? "Shares its saves with your other Switch " + g + " emulators" : "Uses the shared Switch " + g + " saves") + " (" + games(n) + ").";
+            }
             else if (kind == UserData.SaveKind.Own) note = "Keeps its own saves (" + games(n) + ").";
             else if (kind == UserData.SaveKind.OtherFolder) note = "Uses saves in another folder, probably from an earlier install (" + games(n) + ").";
             else if (kind == UserData.SaveKind.AppData) note = "Keeps its saves outside its folder (" + games(n) + "). \"Keep its saves in its own folder\" in its ... menu moves a copy in.";
@@ -1905,7 +1928,7 @@ class EmuForm : Form
             place(k.Def.Name, note, where);
         }
         if (anyShared)
-            text("Emulators that share all use the same saves: progress in one shows up in all of them.", null, Theme.Muted);
+            text("Emulators that share all use the same saves: progress in one shows up in all of them. Switch 1 emulators share with each other, and Switch 2 emulators with each other.", null, Theme.Muted);
 
         // saves that were put aside
         List<Tuple<string, string, DateTime>> aside = UserData.SavedAside();
@@ -1945,7 +1968,7 @@ class EmuForm : Form
         foreach (string line in new[]
         {
             "Not sharing: each emulator keeps its own saves in its own folder.",
-            "Sharing (\"Share data with other emulators\" on a card): all your emulators use one set of saves, so progress in one shows up in all of them.",
+            "Sharing (\"Share data with other Switch 2 emulators\", or Switch 1, on a card): your Switch 2 emulators use one set of saves, and your Switch 1 emulators another, so progress in one shows up in the others of the same Switch.",
             "When sharing starts: saves for games the shared saves don't have are added to them. If two emulators have a save for the same game, the ticked one's is used and the other goes to Backups.",
             "When sharing stops: \"Keep latest\" gives every emulator a copy of the latest saves. \"Restore\" gives the others back the saves they had before. The ticked one always keeps the latest.",
             "Updating an emulator never touches its saves. Older versions (in Older builds) don't contain saves.",
@@ -1955,7 +1978,7 @@ class EmuForm : Form
             text("- " + line, null, Theme.Text);
 
         heading("Back up your saves");
-        text("Close your emulators, then copy the folders under \"Your saves right now\" (the shared one is enough when you share) to a USB stick or a cloud folder. To bring them back, copy them back the same way.", null, Theme.Text);
+        text("Close your emulators, then copy the folders under \"Your saves right now\" (the shared folders are enough when you share) to a USB stick or a cloud folder. To bring them back, copy them back the same way.", null, Theme.Text);
 
         y += D(6);
         Button again = new Button(); again.Text = "Check again"; again.SetBounds(x, y, D(130), D(34)); host.Controls.Add(again);
@@ -2064,7 +2087,7 @@ class EmuForm : Form
     {
         System.Text.StringBuilder b = new System.Text.StringBuilder();
         Action<string> L = s => b.Append(s).Append("\r\n");
-        L("NS2 Emulator Manager " + Core.AppVersion.ToString(3) + (Core.Portable ? " (portable)" : " (installed)"));
+        L("NS2 Emulator Manager " + Core.AppLabel + (Core.Portable ? " (portable)" : " (installed)"));
         L("Windows: " + WindowsName());
         L("Processor: " + (Reg(@"HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\CentralProcessor\0", "ProcessorNameString") ?? "?").Trim());
         try { L("Memory: " + Math.Round(new Microsoft.VisualBasic.Devices.ComputerInfo().TotalPhysicalMemory / 1073741824.0) + " GB"); } catch { }
@@ -2162,6 +2185,9 @@ class EmuForm : Form
         if (o.Count == 0) o.Add("?");
         return o;
     }
+
+    // The ticked emulator of a sharing group (2: Switch 2, 1: Switch 1), or null.
+    static EmuDef HostDef(int g) { string id = UserData.HostId(g); return id == null ? null : Core.Cfg.Emulators.FirstOrDefault(x => x.Id == id); }
 
     void ShowLog()
     {
@@ -2344,9 +2370,11 @@ class EmuForm : Form
             add("Screenshots", "screenshots", false);
             add("Log files", "log", false);
         }
-        if (c.Joined && Directory.Exists(UserData.SharedRoot)) { o.Add(null); o.Add("Shared data"); o.Add((Action)delegate { Explore(UserData.SharedRoot); }); }
+        string sharedDir = UserData.RootOf(d);
+        bool sharedItem = c.Joined && Directory.Exists(sharedDir);
+        if (sharedItem) { o.Add(null); o.Add("Shared data"); o.Add((Action)delegate { Explore(sharedDir); }); }
         List<string> older = Core.Backups(d);
-        if (older.Count > 0) { if (!(c.Joined && Directory.Exists(UserData.SharedRoot))) o.Add(null); o.Add("Older versions"); o.Add((Action)delegate { Explore(Path.GetDirectoryName(older[0].TrimEnd('\\'))); }); }
+        if (older.Count > 0) { if (!sharedItem) o.Add(null); o.Add("Older versions"); o.Add((Action)delegate { Explore(Path.GetDirectoryName(older[0].TrimEnd('\\'))); }); }
         return o.ToArray();
     }
     void OpenDataFolder(string data, string full, bool make)
@@ -2678,7 +2706,7 @@ class EmuForm : Form
         c.Next.Visible = c.NextKind != null && !c.Busy && !IsBusy;
         if (c.Next.Visible) { ly += D(2); c.Next.SetBounds(L, ly, Math.Min(iw, TextRenderer.MeasureText(c.Next.Text, Font).Width + D(8)), D(22)); ly += D(24); }
         if (c.Bar.Visible) { ly += D(6); c.Bar.SetBounds(P, ly, iw, D(8)); ly += D(10); }
-        c.Share.Visible = Installed(c.Def) && UserData.IsPortable(c.Def) && (UserData.CanJoin(c.Def) || Core.Cfg.ShareHost == c.Def.Id);
+        c.Share.Visible = Installed(c.Def) && UserData.IsPortable(c.Def);
         int low = bh + (c.Share.Visible ? D(30) + D(10) : 0) + (c.Existing.Visible ? D(22) + D(10) : 0);
         int natural = ly + D(14) + low + P;
         // measuring only: placing the buttons at this height and then at the row's would make them jump on every
@@ -2827,6 +2855,7 @@ class EmuForm : Form
         string key = InstalledKey();
         InfoData old = info;
         bool walk = sizes || old == null || !old.HasSizes;
+        List<int> live = UserData.Groups.Where(g => UserData.HostId(g) != null).ToList();   // groups sharing now
         ThreadPool.QueueUserWorkItem(delegate
         {
             InfoData r = new InfoData(); r.Key = key; r.Day = DateTime.Today;
@@ -2834,7 +2863,9 @@ class EmuForm : Form
             try { inst = defs.Where(Installed).ToList(); } catch { }
             try
             {
-                r.SharedGames = UserData.CountGames(Path.Combine(UserData.SharedRoot, @"nand\user\save"));
+                HashSet<string> shared = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (int g in live) shared.UnionWith(UserData.GamesIn(Path.Combine(UserData.RootFor(g), @"nand\user\save")));
+                r.SharedGames = shared.Count;
                 HashSet<string> games = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (EmuDef d in inst)
                 {
@@ -2848,9 +2879,12 @@ class EmuForm : Form
                 try
                 {
                     foreach (EmuDef d in inst) r.Emus += DirBytes(d.Dir);
-                    string aside = Path.Combine(UserData.SharedRoot, UserData.SET_ASIDE);
-                    r.Aside = DirBytes(aside);
-                    r.Shared = Math.Max(0, DirBytes(UserData.SharedRoot) - r.Aside);
+                    foreach (int g in UserData.Groups)
+                    {
+                        long aside = DirBytes(Path.Combine(UserData.RootFor(g), UserData.SET_ASIDE));
+                        r.Aside += aside;
+                        r.Shared += Math.Max(0, DirBytes(UserData.RootFor(g)) - aside);
+                    }
                     HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     foreach (EmuDef d in defs)
                         foreach (string b in Core.Backups(d))
@@ -2896,15 +2930,17 @@ class EmuForm : Form
         DateTime thisSunday = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
         int[] weekDays = r != null && r.Day.AddDays(-(int)r.Day.DayOfWeek) == thisSunday ? r.Days : new int[7];   // last week's: not shown
         // saves: who shares comes from the cards (Refresh keeps it current), the counts from the last scan
-        EmuCard hostCard = Core.Cfg.ShareHost == null ? null : inst.FirstOrDefault(k => k.Def.Id == Core.Cfg.ShareHost && k.Joined);
-        bool sharing = hostCard != null;
+        // who shares, per group (Switch 2 and Switch 1 each can have one)
+        List<EmuCard> hostCards = UserData.Groups.Select(g => inst.FirstOrDefault(k => k.Def.Id == UserData.HostId(g) && k.Joined)).Where(k => k != null).ToList();
+        bool sharing = hostCards.Count > 0;
         List<EmuCard> users = sharing ? inst.Where(k => k.Joined).ToList() : inst;
         int games = r == null ? 0 : sharing ? r.SharedGames : r.AllGames;
         Txt(savesCap, sharing ? "Shared saves" : "Saves");
         Txt(savesBig, r == null ? "-" : games.ToString());
         Txt(savesUnit, games == 1 ? "game" : "games");
-        string host = sharing ? hostCard.Def.Name : "";
-        Txt(savesLine, sharing ? (users.Count >= 2 && users.Count == inst.Count ? "All " + users.Count + " emulators use " + host + "'s saves"
+        string host = sharing ? hostCards[0].Def.Name : "";
+        Txt(savesLine, hostCards.Count > 1 ? "Shared from " + string.Join(" and ", hostCards.Select(k => k.Def.Name))
+                     : sharing ? (users.Count >= 2 && users.Count == inst.Count ? "All " + users.Count + " emulators use " + host + "'s saves"
                                   : users.Count >= 2 ? users.Count + " emulators use " + host + "'s saves" : "Shared from " + host)
                      : inst.Count > 1 ? "Each emulator keeps its own saves" : inst.Count == 1 ? "Saved in " + inst[0].Def.Name : "");
         savesWho.People = users.Select(k => Tuple.Create(k.Badge.Text, k.Badge.Tone, k.Badge.Picture)).ToList();
@@ -2942,8 +2978,8 @@ class EmuForm : Form
         bool newer = mgrRel != null;
         Txt(mgrCap, newer ? "Manager update ready" : "Manager");
         roles[mgrCap] = newer ? "accent" : "muted"; mgrCap.ForeColor = newer ? Theme.Accent : RoleColor(mgrCap);
-        Txt(mgrText, newer ? "Version " + mgrVer + " is out" : "Version " + Core.AppVersion + (Core.Portable ? " (portable)" : ""));
-        tips.SetToolTip(mgrText, newer ? "You have " + Core.AppVersion + (Core.Portable ? " (portable)" : "") : null);
+        Txt(mgrText, newer ? "Version " + mgrVer + " is out" : "Version " + Core.AppLabel + (Core.Portable ? " (portable)" : ""));
+        tips.SetToolTip(mgrText, newer ? "You have " + Core.AppLabel + (Core.Portable ? " (portable)" : "") : null);
         bool goShown = newer && !anyBusy;
         if (mgrGo.Visible != goShown) { mgrGo.Visible = goShown; LayoutSoon(); }
         mgrGo.Enabled = !IsBusy;
@@ -3186,21 +3222,22 @@ class EmuForm : Form
         bool portable = installed && UserData.IsPortable(d);
         c.Joined = false;
         List<UserData.Item> shared = portable ? UserData.SharedItems(d) : new List<UserData.Item>();
-        EmuDef hostDef = Core.Cfg.ShareHost == null ? null : Core.Cfg.Emulators.FirstOrDefault(x => x.Id == Core.Cfg.ShareHost);
+        int grp = UserData.GroupOf(d);
+        Txt(c.Share, "Share data with other Switch " + grp + " emulators");   // which Switch's sharing this is
+        EmuDef hostDef = HostDef(grp);
         bool hostHere = hostDef != null && cards.Any(k => k.Def == hostDef && Installed(k.Def) && UserData.IsPortable(k.Def));
         if (hostDef != null && installed && !portable) c.Data.Text = "Not sharing: it keeps its saves outside its folder.";
         else if (hostDef != null && portable)
         {
             bool all = UserData.HostItems.All(i => UserData.StateOf(d, i) == UserData.State.On);
             c.Joined = hostDef == d || all;
-            if (hostDef == d) c.Data.Text = "Your other emulators use this data.";
+            if (hostDef == d) c.Data.Text = "Your other Switch " + grp + " emulators use this data.";
             else if (all) c.Data.Text = "Uses " + hostDef.Name + "'s data.";
-            else if (!UserData.CanJoin(d)) c.Data.Text = "Not sharing: Switch 1 emulators keep their own data.";
             else
             {   // not joined yet: say what it waits for
                 string why; joinWhy.TryGetValue(d.Id, out why);
                 List<string> open = cards.Where(k => Installed(k.Def) && Core.Running(k.Def).Count > 0 &&
-                                                     (k == c || UserData.HostItems.Any(i => UserData.StateOf(k.Def, i) != UserData.State.Off))).Select(k => k.Def.Name).ToList();
+                                                     (k == c || UserData.LinkedIntoGroup(k.Def, grp))).Select(k => k.Def.Name).ToList();
                 c.Data.Text = UserData.OddLinks(d) ? "Not sharing: it uses a folder link the manager didn't make."
                             : open.Count > 0 ? "Not sharing yet: close " + string.Join(" and ", open) + " first."
                             : why != null ? "Not sharing yet: " + why + "."
@@ -3211,7 +3248,7 @@ class EmuForm : Form
         c.Share.Checked = hostDef == d;
         c.Share.Enabled = !c.Busy && !IsBusy && (hostDef == null || hostDef == d || !hostHere) && UserData.CanShare;   // one at a time: the others are greyed out
         if (!UserData.CanShare && portable) { c.Share.Checked = false; c.Data.Text = "Not sharing: this drive can't share saves (most USB sticks can't)."; }
-        tips.SetToolTip(c.Share, UserData.CanShare ? "Your other emulators use this one's keys, firmware and saves, so progress shows up in all of them. Their own data is kept as a backup." : UserData.NO_SHARE);
+        tips.SetToolTip(c.Share, UserData.CanShare ? "Your other Switch " + grp + " emulators use this one's keys, firmware and saves, so progress shows up in all of them. Their own data is kept as a backup." : UserData.NO_SHARE);
         c.NextKind = !installed || c.Busy ? null : !portable ? "portable" : NoReminder(d) ? null : !HasKeys(d) ? "keys" : !HasFirmware(d) ? "firmware" : null;
         c.Next.Text = c.NextKind == "portable" ? "Keep its saves in its own folder" : c.NextKind == "keys" ? "Next: add your keys" : c.NextKind == "firmware" ? "Next: add firmware" : "";
 
@@ -3454,8 +3491,8 @@ class EmuForm : Form
     readonly Dictionary<string, string> joinWhy = new Dictionary<string, string>();   // id -> why it didn't join (plain words); retried on Activated
     void JoinSharing(EmuCard c)
     {
-        if (Core.Cfg.ShareHost == null || !UserData.CanShare) return;   // a drive without links (FAT32 / exFAT): sharing waits for one that has them
-        List<EmuCard> need = cards.Where(k => (c == null || k == c) && Installed(k.Def) && UserData.IsPortable(k.Def) && UserData.CanJoin(k.Def) && !joinWhy.ContainsKey(k.Def.Id) &&
+        if (UserData.Groups.All(g => UserData.HostId(g) == null) || !UserData.CanShare) return;   // a drive without links (FAT32 / exFAT): sharing waits for one that has them
+        List<EmuCard> need = cards.Where(k => (c == null || k == c) && Installed(k.Def) && UserData.IsPortable(k.Def) && UserData.HostId(UserData.GroupOf(k.Def)) != null && !joinWhy.ContainsKey(k.Def.Id) &&
                                               UserData.HostItems.Any(i => UserData.StateOf(k.Def, i) != UserData.State.On)).ToList();
         if (need.Count == 0) return;
         if (IsBusy || installQueue.Count > 0 || addingFound > 0) { joinPending = true; return; }
@@ -3463,7 +3500,8 @@ class EmuForm : Form
         {
             if (IsBusy || installQueue.Count > 0 || addingFound > 0) { joinPending = true; return; }
             // any open emulator that uses the shared data, or that would join, blocks it: try again later (Activated)
-            if (cards.Any(k => Installed(k.Def) && Core.Running(k.Def).Count > 0 && (need.Contains(k) || UserData.HostItems.Any(i => UserData.StateOf(k.Def, i) != UserData.State.Off))))
+            HashSet<int> groups = new HashSet<int>(need.Select(k => UserData.GroupOf(k.Def)));
+            if (cards.Any(k => Installed(k.Def) && Core.Running(k.Def).Count > 0 && (need.Contains(k) || groups.Any(g => UserData.LinkedIntoGroup(k.Def, g)))))
             { joinPending = true; Log("Joining shared data waits until the emulators are closed."); RefreshAll(); return; }
             List<EmuCard> todo = new List<EmuCard>();
             foreach (EmuCard k in need)
@@ -3494,13 +3532,24 @@ class EmuForm : Form
         try
         {
             bool changed = false;
-            if (Core.Cfg.ShareHost != null && !Core.Cfg.Emulators.Any(x => x.Id == Core.Cfg.ShareHost)) { Core.Cfg.ShareHost = null; changed = true; }
-            bool stopping = Core.Cfg.ShareBackups != null || Core.Cfg.ShareMerged != null;   // a stop that didn't finish: don't turn sharing back on
-            if (Core.Cfg.ShareHost == null && !stopping)
+            foreach (int g in UserData.Groups)
             {
-                EmuCard full = cards.FirstOrDefault(k => Installed(k.Def) && UserData.IsPortable(k.Def) && UserData.CanJoin(k.Def) && UserData.HostItems.All(i => UserData.StateOf(k.Def, i) == UserData.State.On));
-                if (full != null) { Core.Cfg.ShareHost = full.Def.Id; Core.Cfg.ShareNew = UserData.HostItems.Select(i => i.Key).ToList(); changed = true; Log("Sharing was on: " + full.Def.Name + " is ticked."); }
-                else if (Core.Cfg.ShareNew != null) { Core.Cfg.ShareNew = null; changed = true; }
+                string hid = UserData.HostId(g);
+                // the ticked one is gone, or (changed to the other Switch, or an older version's setup) no longer in this
+                // group: one of the group's emulators that still fully shares is ticked instead
+                if (hid != null && !Core.Cfg.Emulators.Any(x => x.Id == hid && UserData.GroupOf(x) == g))
+                {
+                    EmuCard heir = cards.FirstOrDefault(k => Installed(k.Def) && UserData.IsPortable(k.Def) && UserData.GroupOf(k.Def) == g && UserData.HostItems.All(i => UserData.StateOf(k.Def, i) == UserData.State.On));
+                    UserData.SetHost(g, heir != null ? heir.Def.Id : null); changed = true;
+                    if (heir != null) Log("Switch " + g + " sharing goes on with " + heir.Def.Name + " ticked.");
+                }
+                bool stopping = UserData.Stopping(g);   // a stop that didn't finish: don't turn sharing back on
+                if (UserData.HostId(g) == null && !stopping)
+                {
+                    EmuCard full = cards.FirstOrDefault(k => Installed(k.Def) && UserData.IsPortable(k.Def) && UserData.GroupOf(k.Def) == g && UserData.HostItems.All(i => UserData.StateOf(k.Def, i) == UserData.State.On));
+                    if (full != null) { UserData.SetHost(g, full.Def.Id); UserData.SetNew(g, UserData.HostItems.Select(i => i.Key).ToList()); changed = true; Log("Switch " + g + " sharing was on: " + full.Def.Name + " is ticked."); }
+                    else if (UserData.NewOf(g) != null) { UserData.SetNew(g, null); changed = true; }
+                }
             }
             if (changed) Core.SaveConfig();
         }
@@ -3518,14 +3567,18 @@ class EmuForm : Form
         if (IsBusy) { PleaseWait(); return; }
         if (!UserData.CanShare) { Tell("Share data", UserData.NO_SHARE); RefreshAll(); return; }
         EmuDef d = c.Def;
-        if (!UserData.CanJoin(d) && Core.Cfg.ShareHost != d.Id) { Tell("Share data", UserData.SWITCH1_OWN); RefreshAll(); return; }
-        List<EmuCard> inst = cards.Where(k => Installed(k.Def) && UserData.IsPortable(k.Def)).ToList();
-        EmuDef host = Core.Cfg.ShareHost == null ? null : Core.Cfg.Emulators.FirstOrDefault(x => x.Id == Core.Cfg.ShareHost);
+        int g = UserData.GroupOf(d);   // Switch 1 shares with Switch 1, Switch 2 with Switch 2
+        string sw = "Switch " + g;
+        // its group, plus any emulator an older version linked into the group's folder (it gets its own copy when it stops)
+        List<EmuDef> groupDefs = UserData.InGroup(g, cards.Where(k => Installed(k.Def)).Select(k => k.Def));
+        List<EmuCard> inst = cards.Where(k => groupDefs.Contains(k.Def)).ToList();
+        EmuDef host = HostDef(g);
         List<string> open = inst.Where(k => Core.Running(k.Def).Count > 0).Select(k => k.Def.Name).ToList();
         if (host == d)
         {
             // the ticked one always keeps the latest; the others keep the latest too, or go back to their own saves
-            List<EmuCard> others = inst.Where(k => k.Def != d && UserData.HostItems.Any(i => UserData.StateOf(k.Def, i) != UserData.State.Off)).ToList();
+            string groupRoot = UserData.RootFor(g);
+            List<EmuCard> others = inst.Where(k => k.Def != d && UserData.LinkedIntoGroup(k.Def, g)).ToList();
             List<EmuCard> can = others.Where(k => UserData.CanGoBack(k.Def)).ToList(), cannot = others.Where(k => !can.Contains(k)).ToList();
             bool canBack = can.Count > 0;
             string only = can.Count > 0 && cannot.Count > 0   // shared since an older version: not every one has its old saves recorded
@@ -3538,24 +3591,24 @@ class EmuForm : Form
             bool goBack = r == 1;
             if (open.Count > 0) { Tell("Stop sharing", "Close " + string.Join(" and ", open) + " first."); return; }
             List<EmuDef> defs = inst.Select(k => k.Def).ToList();
-            string sp = UserData.StopProblem(defs);
+            string sp = UserData.StopProblem(g, defs);
             if (sp != null) { Tell("Stop sharing", sp); return; }
             // sharing counts as off from now on, so nothing joins again if stopping fails partway (the Restore records
             // stay until it succeeds)
-            Core.Cfg.ShareHost = null; Core.Cfg.ShareNew = null;
+            UserData.SetHost(g, null); UserData.SetNew(g, null);
             try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save: " + ex.Message); }
-            Work(c, "Stopping sharing", (log, prog) => UserData.StopSharing(d, defs, goBack, log), delegate
+            Work(c, "Stopping sharing", (log, prog) => UserData.StopSharing(g, d, defs, goBack, log), delegate
             {
-                Core.Cfg.ShareHost = null; Core.Cfg.ShareNew = null;
+                UserData.SetHost(g, null); UserData.SetNew(g, null);
                 try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save: " + ex.Message); }
-                Log("Sharing stopped; every emulator has its own copy.");
+                Log(sw + " sharing stopped; every " + sw + " emulator has its own copy.");
                 RefreshAll();
             });
             return;
         }
         if (host != null && cards.Any(k => k.Def == host))
         {   // switching which one is ticked: the data everyone uses stays the same (the latest progress)
-            Core.Cfg.ShareHost = d.Id;
+            UserData.SetHost(g, d.Id);
             try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save: " + ex.Message); }
             Log(d.Name + " is now the one that shares (was " + host.Name + "); everyone keeps the same data.");
             RefreshAll();
@@ -3565,22 +3618,25 @@ class EmuForm : Form
         if (open.Count > 0) { Tell("Share data", "Close " + string.Join(" and ", open) + " first."); return; }
         if (UserData.OddLinks(d)) { Tell("Share data", d.Name + "'s data uses a folder link the manager didn't make, so it can't be shared."); return; }
         // data linked to another shared folder (an earlier install in another place) is copied in first; say so here
-        List<EmuCard> foreign = cards.Where(k => Installed(k.Def) && UserData.IsPortable(k.Def) && UserData.ForeignLinks(k.Def).Count > 0).ToList();
+        List<EmuCard> foreign = cards.Where(k => Installed(k.Def) && UserData.IsPortable(k.Def) && UserData.GroupOf(k.Def) == g && UserData.ForeignLinks(k.Def).Count > 0).ToList();
         string copyNote = "";
         if (foreign.Count > 0)
         {
             string names = string.Join(" and ", foreign.Select(k => k.Def.Name)), root = UserData.ForeignRoot(foreign[0].Def);
-            copyNote = "\r\n\r\n" + names + (foreign.Count == 1 ? " uses" : " use") + " data from another folder (" + root + "), probably from an earlier install. It's copied in first; that folder isn't changed.";
+            bool otherSwitch = root != null && string.Equals(Path.GetFullPath(root).TrimEnd('\\'), Path.GetFullPath(UserData.RootFor(3 - g)).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+            copyNote = otherSwitch
+                ? "\r\n\r\n" + names + (foreign.Count == 1 ? " uses" : " use") + " the Switch " + (3 - g) + " shared data (set up by an older version). " + (foreign.Count == 1 ? "It gets" : "They get") + " its own copy first; the Switch " + (3 - g) + " data isn't changed."
+                : "\r\n\r\n" + names + (foreign.Count == 1 ? " uses" : " use") + " data from another folder (" + root + "), probably from an earlier install. It's copied in first; that folder isn't changed.";
         }
-        if (Ask("Share " + d.Name + "'s data", "All your emulators will use " + d.Name + "'s keys, firmware and saves, so progress shows up in all of them. Saves for other games are kept.\r\n\r\nIf two emulators have a save for the same game, " + d.Name + "'s is used and the other is kept as a backup." + copyNote, "Share", "Cancel") != 0) return;
-        List<EmuDef> all = cards.Where(k => Installed(k.Def)).Select(k => k.Def).ToList();   // not-portable ones are named as left out
+        if (Ask("Share " + d.Name + "'s data", "All your " + sw + " emulators will use " + d.Name + "'s keys, firmware and saves, so progress shows up in all of them. Saves for other games are kept.\r\n\r\nIf two emulators have a save for the same game, " + d.Name + "'s is used and the other is kept as a backup." + copyNote, "Share", "Cancel") != 0) return;
+        List<EmuDef> all = cards.Where(k => Installed(k.Def) && UserData.GroupOf(k.Def) == g).Select(k => k.Def).ToList();   // not-portable ones are named as left out
         if (!all.Contains(d)) all.Insert(0, d);
         List<string> left = new List<string>();
         Work(c, "Sharing data", (log, prog) => { left = UserData.StartSharing(d, all, log); }, delegate
         {
-            Core.Cfg.ShareHost = d.Id; Core.Cfg.ShareNew = UserData.HostItems.Select(i => i.Key).ToList();
+            UserData.SetHost(g, d.Id); UserData.SetNew(g, UserData.HostItems.Select(i => i.Key).ToList());
             try { Core.SaveConfig(); } catch (Exception ex) { Log("Could not save: " + ex.Message); }
-            Log("Sharing " + d.Name + "'s keys, firmware and saves with every emulator" + (left.Count > 0 ? ", except " + string.Join("; ", left) : "") + ".");
+            Log("Sharing " + d.Name + "'s keys, firmware and saves with every " + sw + " emulator" + (left.Count > 0 ? ", except " + string.Join("; ", left) : "") + ".");
             RefreshAll();
             if (left.Count > 0)
             {
@@ -3607,7 +3663,7 @@ class EmuForm : Form
             foreach (UserData.Item it in UserData.Items)
             {
                 CheckBox cb = new CheckBox(); cb.Text = it.Label; cb.SetBounds(D(20), y, W - D(40), D(28)); cb.ForeColor = Theme.Text; cb.BackColor = Theme.Window;
-                List<EmuCard> port = inst.Where(k => UserData.IsPortable(k.Def)).ToList();
+                List<EmuCard> port = inst.Where(k => UserData.IsPortable(k.Def) && UserData.GroupOf(k.Def) == 2).ToList();
                 bool on = port.Count > 0 ? port.Any(k => UserData.StateOf(k.Def, it) != UserData.State.Off)
                                          : Core.Cfg.ShareNew != null && Core.Cfg.ShareNew.Contains(it.Key);
                 cb.Checked = on;
@@ -3639,7 +3695,7 @@ class EmuForm : Form
     void ApplyShared(List<string> want, EmuCard prefer, ICollection<string> preferFor)
     {
         if (IsBusy) { PleaseWait(); return; }
-        List<EmuCard> inst = cards.Where(k => Installed(k.Def) && UserData.IsPortable(k.Def)).ToList();
+        List<EmuCard> inst = cards.Where(k => Installed(k.Def) && UserData.IsPortable(k.Def) && UserData.GroupOf(k.Def) == 2).ToList();   // the Switch 2 group
         Action saveChoice = () =>
         {
             Core.Cfg.ShareNew = want.Count > 0 ? want.ToList() : null;
@@ -3657,7 +3713,7 @@ class EmuForm : Form
         foreach (UserData.Item it in UserData.Items.Where(i => want.Contains(i.Key)))
         {
             List<EmuCard> holders = inst.Where(k => UserData.StateOf(k.Def, it) != UserData.State.On && UserData.OwnData(k.Def, it)).ToList();
-            bool sharedHas = UserData.SharedHasData(it);
+            bool sharedHas = UserData.SharedHasData(it, 2);
             List<EmuCard> distinct = UserData.DistinctHolders(it, holders.Select(h => h.Def).ToList()).Select(def => holders.First(h => h.Def == def)).ToList();
             if (distinct.Count == 0) continue;
             if (distinct.Count == 1 && !sharedHas) { keep[it.Key] = distinct[0]; continue; }
@@ -3665,7 +3721,7 @@ class EmuForm : Form
             // newest first, so the default button is the copy changed last
             List<KeyValuePair<string, EmuCard>> cand = distinct.Select(h => new KeyValuePair<string, EmuCard>(h.Def.Name + "'s", h)).ToList();
             if (sharedHas) cand.Add(new KeyValuePair<string, EmuCard>("the shared ones", null));
-            cand = cand.OrderByDescending(p => UserData.LastChanged(it, p.Value != null ? p.Value.Def : null)).ToList();
+            cand = cand.OrderByDescending(p => UserData.LastChanged(it, p.Value != null ? p.Value.Def : null, 2)).ToList();
             List<string> opts = cand.Select((p, i) => "Use " + p.Key + (i == 0 ? " (newest)" : "")).ToList();
             opts.Add("Cancel");
             int r = Ask("Shared data", "Your emulators have different " + it.Label.ToLower() + ". Which should all of them use?\r\n\r\nThe others are kept in the Shared data folder (firmware goes to " + Bin + ").", opts.ToArray());
@@ -3705,7 +3761,7 @@ class EmuForm : Form
         Core.Cfg.Emulators.Remove(c.Def);
         try { Core.SaveConfig(); } catch { }
         cards.Remove(c); cardsHost.Controls.Remove(c.Box); c.Box.Dispose();
-        if (Core.Cfg.ShareHost == c.Def.Id) { SharingFromOlderVersions(); RefreshAll(); }   // another linked one is ticked, or none
+        if (UserData.Groups.Any(g => UserData.HostId(g) == c.Def.Id)) { SharingFromOlderVersions(); RefreshAll(); }   // another linked one is ticked, or none
         DoLayout();
     }
 
@@ -4012,7 +4068,7 @@ class EmuForm : Form
             string msg = Core.Adopt(d, id);
             Log(msg); status("Added.");
             card = c ?? AddDef(d, null);   // recommended build: on the list from now on
-            if (Core.Cfg.ShareHost == null) { SharingFromOlderVersions(); RefreshAll(); }   // it already shares (an earlier install): tick a card
+            if (UserData.HostId(UserData.GroupOf(d)) == null) { SharingFromOlderVersions(); RefreshAll(); }   // it already shares (an earlier install): tick a card
             if (c != null) { Refresh(c); CheckOne(c, null); }
         }
         catch (Exception ex)
@@ -5010,8 +5066,9 @@ class EmuForm : Form
                 {
                     string hid = a[++i]; EmuDef h = Core.Cfg.Emulators.First(x => x.Id == hid);
                     List<EmuDef> all = Core.Cfg.Emulators.Where(x => !string.IsNullOrEmpty(x.Exe) && File.Exists(Path.Combine(x.Dir, x.Exe)) && UserData.IsPortable(x)).ToList();
-                    if (Core.Cfg.ShareHost == null) UserData.StartSharing(h, all, log);
-                    Core.Cfg.ShareHost = h.Id; Core.Cfg.ShareNew = UserData.HostItems.Select(it => it.Key).ToList(); Core.SaveConfig();
+                    int hg = UserData.GroupOf(h);
+                    if (UserData.HostId(hg) == null) UserData.StartSharing(h, all, log);
+                    UserData.SetHost(hg, h.Id); UserData.SetNew(hg, UserData.HostItems.Select(it => it.Key).ToList()); Core.SaveConfig();
                     log("host -> " + h.Id);
                     continue;
                 }
@@ -5026,9 +5083,11 @@ class EmuForm : Form
                 }
                 if (a[i] == "host-stop" || a[i] == "host-stop-back")   // test: untick; -back = the others go back to their own saves
                 {
-                    EmuDef hd = Core.Cfg.Emulators.FirstOrDefault(x => x.Id == Core.Cfg.ShareHost);
-                    UserData.StopSharing(hd, Core.Cfg.Emulators.Where(x => UserData.IsPortable(x)).ToList(), a[i] == "host-stop-back", log);
-                    Core.Cfg.ShareHost = null; Core.Cfg.ShareNew = null; Core.SaveConfig();
+                    bool back = a[i] == "host-stop-back";
+                    int sg = i + 1 < a.Count && (a[i + 1] == "1" || a[i + 1] == "2") ? int.Parse(a[++i]) : 2;   // host-stop [1|2]: which group
+                    EmuDef hd = HostDef(sg);
+                    UserData.StopSharing(sg, hd, UserData.InGroup(sg, Core.Cfg.Emulators), back, log);
+                    UserData.SetHost(sg, null); UserData.SetNew(sg, null); Core.SaveConfig();
                     log("sharing stopped");
                     continue;
                 }
@@ -5038,7 +5097,7 @@ class EmuForm : Form
                         Release r; try { r = Core.Latest(d, a[i] == "check-fresh"); } catch (Exception ex) { log(d.Id + ": ERROR " + ex.Message + " -> shown as: " + CheckFailed(ex.Message)); continue; }
                         Manifest m = Core.LoadManifest(d.Dir);
                         log(d.Id + ": installed=" + (Core.Describe(d) ?? "none") + " latest=" + r.Tag + " asset=" + r.Asset + " size=" + r.Size + " sha256=" + (r.Sha256 ?? "none") +
-                            " current=" + (m != null && m.Tag == r.Tag));
+                            " current=" + (m != null && m.Tag == r.Tag) + " linked=" + r.Linked + " url=" + r.AssetUrl);
                     }
                 else if (a[i] == "add-recommended")   // add-recommended ID: put a recommended build on the list (tests)
                 {
@@ -5070,6 +5129,19 @@ class EmuForm : Form
                     log("identify " + id + " " + dir + " -> " + (r.Rel != null ? r.Rel.Tag + " / " + r.Rel.Asset : "not recognised") + " | " + r.Why +
                         " | user=" + r.HasUser + " entries=" + (r.Entries != null ? r.Entries.Count : 0) + " | " + n + " zips, " + (DateTime.Now - t0).TotalSeconds.ToString("0.0") + " s");
                 }
+                else if (a[i] == "versions")   // versions ID: Choose version's list (newest first) with each one's file
+                {
+                    EmuDef d = Core.Cfg.Emulators.First(x => x.Id == a[i + 1]); i++;
+                    string rec; List<Release> all = Core.AllReleases(d, out rec);
+                    log(d.Id + ": " + all.Count + " versions, Update installs " + (rec ?? "none"));
+                    foreach (Release r in all.Take(40)) log("  " + r.Tag + " " + r.Published + " " + r.Asset + (r.Linked ? " [linked] " + r.AssetUrl : ""));
+                }
+                else if (a[i] == "linked-test")   // linked-test HOST APIBASE REPO TAG BODYFILE ATTACHED(0/1): the links taken from release notes
+                {
+                    string host = a[++i], api = a[++i], repo = a[++i], tag = a[++i], body = File.ReadAllText(a[++i]); bool att = a[++i] == "1";
+                    List<string> got = Core.LinkedFilesFor(host, api == "-" ? null : api, repo, tag, body, att);
+                    log("linked-test " + tag + ": " + (got.Count == 0 ? "(none)" : string.Join(" ", got)));
+                }
                 else if (a[i] == "lookup")     // what Add new fork would find for a link
                 {
                     string link = a[++i];
@@ -5083,7 +5155,7 @@ class EmuForm : Form
                         {
                             EmuDef t = new EmuDef { Id = "t", Name = "t", Host = ri.Host, ApiBase = ri.ApiBase, Repo = ri.Repo, TagPrefix = ri.DefaultPrefix, Assets = Core.AssetPatterns(pgo && ri.HasPgo) };
                             Release r = Core.Latest(t);
-                            log("  latest (" + (pgo && ri.HasPgo ? "pgo" : "standard") + "): " + r.Tag + " " + r.Asset + " sha256=" + (r.Sha256 != null));
+                            log("  latest (" + (pgo && ri.HasPgo ? "pgo" : "standard") + "): " + r.Tag + " " + r.Asset + " sha256=" + (r.Sha256 != null) + " linked=" + r.Linked + " url=" + r.AssetUrl);
                         }
                     }
                     catch (Exception ex) { log("lookup " + link + " -> ERROR " + ex.Message); }
